@@ -1,5 +1,13 @@
 %{
 #include <stdio.h>
+#include "Hash.h"
+
+typedef struct Hash Hash;
+
+Hash* inicializa();
+
+Hash* hash;
+
 %}
 %token tk_absolute 
 %token tk_and 
@@ -117,16 +125,14 @@ VARIAVEIS: 				tk_var DECLARACAO_VARIAVEIS
 DECLARACAO_VARIAVEIS: 	LISTA_VARIAVEIS tk_doisPontos TIPO tk_pontoEVirgula
 						| DECLARACAO_VARIAVEIS LISTA_VARIAVEIS tk_doisPontos TIPO tk_pontoEVirgula
 ;
-LISTA_VARIAVEIS: 		tk_identificador  
+LISTA_VARIAVEIS: 		tk_identificador {}
 						| LISTA_VARIAVEIS tk_virgula tk_identificador
 ;
 /* Vetores ou tipo */
 TIPO: 					TIPO_PADRAO
 						| tk_array tk_abreColchete DIMENSAO_LISTA tk_fechaColchete tk_of TIPO_PADRAO
 ;
-/*DIMENSAO: 				tk_abreColchete tk_numeroInteiro tk_pontoPonto tk_numeroInteiro tk_fechaColchete 
-						| tk_abreColchete tk_numeroInteiro tk_pontoPonto tk_numeroInteiro tk_fechaColchete DIMENSAO
-;*/
+
 DIMENSAO_LISTA:			DIMENSAO 	| DIMENSAO_LISTA tk_virgula DIMENSAO
 ;
 DIMENSAO: 				tk_numeroInteiro tk_pontoPonto tk_numeroInteiro ;
@@ -267,13 +273,50 @@ ADDOP: 					tk_mais
 %%
 
 #include "lex.yy.c"
+#define HASHSIZE 97
 
-main(){
-	yyparse();
+struct Hash{
+	char* 			variavel;
+	struct Hash* 	prox;
+	
+};
+
+Hash* inicializa(){
+	Hash* h = (Hash*)malloc(97*sizeof(Hash));
+
+	int i;
+	for( i = 0 ; i < HASHSIZE ; i++ ){
+		h->variavel = (char*)malloc(50*sizeof(char));
+		h->prox 	= NULL;
+	}
+	return h;
 }
 
-/* Rotina chamada por yyparse quando encontra erro */
+main(){
+
+	hash = inicializa();
+	
+	
+	
+	//yyparse();
+}
+
 yyerror (void){
 	printf("Erro na Linha: %d\n", Nlinha);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
