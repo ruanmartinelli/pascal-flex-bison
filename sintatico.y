@@ -1,14 +1,21 @@
 %{
 #include <stdio.h>
-#include "Hash.h"
+#include<string.h>
 
 typedef struct Hash Hash;
 
+typedef struct Variavel Variavel;
+
+extern char* yytext;
+
 Hash* inicializa();
 
-Hash* hash;
+void add(char* texto);
+
+Hash* hash[97];
 
 %}
+
 %token tk_absolute 
 %token tk_and 
 %token tk_array 
@@ -103,10 +110,10 @@ Hash* hash;
 %%
 
 /* Inicio do programa. */
-PROG: 					CABECALHO BLOCO tk_ponto
+PROG: 					CABECALHO BLOCO tk_ponto 
 ;
 
-CABECALHO: 				tk_program tk_identificador tk_pontoEVirgula
+CABECALHO: 				tk_program tk_identificador tk_pontoEVirgula 
 ;
 
 /* Bloco agrega todos os demais componentes do programa */
@@ -121,19 +128,20 @@ BLOCO: 					VARIAVEIS BLOCO
 ;
 /* Declaracao inicial das variaveis. */
 VARIAVEIS: 				tk_var DECLARACAO_VARIAVEIS
-;
-DECLARACAO_VARIAVEIS: 	LISTA_VARIAVEIS tk_doisPontos TIPO tk_pontoEVirgula
+;						//a, b
+DECLARACAO_VARIAVEIS: 	LISTA_VARIAVEIS tk_doisPontos TIPO {printf("%s\n", yytext);} tk_pontoEVirgula
 						| DECLARACAO_VARIAVEIS LISTA_VARIAVEIS tk_doisPontos TIPO tk_pontoEVirgula
 ;
 LISTA_VARIAVEIS: 		tk_identificador {}
-						| LISTA_VARIAVEIS tk_virgula tk_identificador
+						| LISTA_VARIAVEIS tk_virgula tk_identificador {add(yytext);}
 ;
 /* Vetores ou tipo */
 TIPO: 					TIPO_PADRAO
 						| tk_array tk_abreColchete DIMENSAO_LISTA tk_fechaColchete tk_of TIPO_PADRAO
 ;
 
-DIMENSAO_LISTA:			DIMENSAO 	| DIMENSAO_LISTA tk_virgula DIMENSAO
+DIMENSAO_LISTA:			DIMENSAO 	
+						| DIMENSAO_LISTA tk_virgula DIMENSAO
 ;
 DIMENSAO: 				tk_numeroInteiro tk_pontoPonto tk_numeroInteiro ;
 TIPO_PADRAO: 			tk_integer
@@ -276,29 +284,45 @@ ADDOP: 					tk_mais
 #define HASHSIZE 97
 
 struct Hash{
-	char* 			variavel;
+	Variavel* 		variavel;
 	struct Hash* 	prox;
 	
 };
 
-Hash* inicializa(){
-	Hash* h = (Hash*)malloc(97*sizeof(Hash));
+struct Variavel{
+	char* nome;
+	char* tipo;
+	char* escopo;
+	//valor tipo
+};
 
-	int i;
-	for( i = 0 ; i < HASHSIZE ; i++ ){
-		h->variavel = (char*)malloc(50*sizeof(char));
+Hash* inicializa(){
+	Hash* h = (Hash*)malloc(sizeof(Hash));
+
+	//int i;
+	//for( i = 0 ; i < HASHSIZE ; i++ ){
+		h->variavel = (Variavel*)malloc(50*sizeof(Variavel));
+		h->variavel->nome = (char*)malloc(50*sizeof(char));
 		h->prox 	= NULL;
-	}
+	//}
 	return h;
 }
 
-main(){
+void add(char* texto){
+	hash[0] = (Hash*)malloc(sizeof(Hash));
+	hash[0]->variavel = (Variavel*)malloc(50*sizeof(Variavel));
+	hash[0]->variavel->nome = (char*)malloc(50*sizeof(char));
+	strcpy(hash[0]->variavel->nome,texto);
+}
 
-	hash = inicializa();
+
+main(){
+	//hash[0] = inicializa();
+	//hash[0]->variavel->nome = "d";
 	
+	yyparse();
+	printf("%s",hash[0]->variavel->nome);
 	
-	
-	//yyparse();
 }
 
 yyerror (void){
