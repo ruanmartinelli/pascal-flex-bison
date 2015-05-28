@@ -6,10 +6,17 @@
 typedef struct Hash Hash;
 typedef struct Variavel Variavel;
 typedef struct Identificador Identificador;
+typedef struct Pilha Pilha;
 
 extern char* 	yytext;
 Hash* 			hash[977];
 Identificador* 	lista;
+Pilha* 			pilha;
+
+struct Pilha{
+	char* nome;
+	struct Pilha* prox;
+};
 
 struct Hash{
 	Variavel* 		variavel;
@@ -29,10 +36,36 @@ struct Identificador{
 };
 
 
-void init(){
-	lista = (Identificador *) malloc (sizeof(Identificador));
+void initLista(){
+	lista 		= (Identificador *) malloc (sizeof(Identificador));
 	lista->prox = NULL;
 }
+
+void initPilha(){
+	//pilha 		= (Pilha*) malloc (sizeof(Pilha));
+	//pilha->nome = (char*) malloc (sizeof(char)*50);
+	//pilha->prox = NULL;
+	pilha 		= NULL;
+	pilha->prox = NULL;
+}
+
+void pushEscopo(char* nome){
+	Pilha* novo = (Pilha*) malloc (sizeof(Pilha));
+	novo->nome  = (char*) malloc (sizeof(char)*50);
+	//novo->prox  = NULL;
+	strcpy		(novo->nome,nome);
+	novo->prox  = pilha;
+	pilha 		= novo;
+
+}
+
+void popEscopo(){
+	Pilha* aux = (Pilha*) malloc (sizeof(Pilha)); 
+	aux = pilha;
+	pilha = pilha->prox;
+	free(aux);
+}
+
 
 int h(char* nome){
 	int i,
@@ -50,10 +83,20 @@ void insereHash(char* nome, char* tipo){
 	novo->variavel 			= (Variavel*)	malloc(sizeof(Variavel));
 	novo->variavel->nome 	= (char*)		malloc(sizeof(char)*tamanhoNome);
 	novo->variavel->tipo 	= (char*)		malloc(sizeof(char)*tamanhoTipo);
+	novo->prox  			= NULL;
 	strcpy					(novo->variavel->nome, nome);
 	strcpy					(novo->variavel->tipo, tipo);
 	int indice 				= h(nome);
-	hash[indice] 			= novo;
+
+	int add = 0;
+	if(hash[indice] == NULL){
+		hash[indice] 		= novo;
+
+	}else{
+		if(hash[indice] != NULL){
+			hash[indice]->prox 	= novo;
+		}
+	}
 	//printf("Inseri: %s no Indice: %d\n", hash[indice]->variavel->nome, indice);
 }
 
@@ -83,11 +126,23 @@ void adicionaListaTabela(char* tipo){
 void imprimeHash(){
 	int i;
 	for(i = 0 ; i < 977 ; i++){
-		if(hash[i] != NULL)
-		{
-			printf("%s	-	%s\n", hash[i]->variavel->nome, hash[i]->variavel->tipo);
+		if(hash[i] != NULL){
+			Hash* aux;
+			for(aux = hash[i] ; aux != NULL; aux = aux->prox){
+				printf("%s	-	%s\n", aux->variavel->nome, aux->variavel->tipo);
+			}
 		}
 	}
+}
+
+void imprimePilha(){
+	int i;
+	Pilha* p;
+	printf("Pilha: \n");
+	for(p = pilha; p!= NULL; p = p->prox){
+		printf("%s\n", p->nome);
+	}
+	printf("Sai do for");
 }
 
 %}
@@ -241,14 +296,14 @@ LISTA_ARGUMENTOS: 		LISTA_VARIAVEIS tk_doisPontos TIPO
 ;
 
 /* Declaracao de Funcoes */
-DECLARACAO_FUNCTION: 	CABECALHO_FUNCTION BLOCO tk_pontoEVirgula
+DECLARACAO_FUNCTION: 	CABECALHO_FUNCTION BLOCO tk_pontoEVirgula 
 						| CABECALHO_FUNCTION tk_forward tk_pontoEVirgula
 ;
-CABECALHO_FUNCTION: 	tk_function tk_identificador ARGUMENTOS tk_doisPontos TIPO_PADRAO tk_pontoEVirgula
+CABECALHO_FUNCTION: 	tk_function tk_identificador {/*escopo = yytext*/} ARGUMENTOS tk_doisPontos TIPO_PADRAO tk_pontoEVirgula
 ;
 
 /* Corpo representa tudo que pode ser incluido dentro do escopo de um begin-end */
-CORPO: 					tk_begin CORPO_LISTA tk_end 
+CORPO: 					tk_begin CORPO_LISTA tk_end {}
 						| tk_begin tk_end
 ;
 CORPO_LISTA: 			DECLARACAO tk_pontoEVirgula
@@ -360,9 +415,13 @@ ADDOP: 					tk_mais
 #define HASHSIZE 97
 
 main(){
-	init(); /* Inicializa Lista. */
+	initLista(); /* Inicializa Lista. */
+	//initPilha();
+/* 	initHash(); */
 	yyparse();
+	//pushEscopo("haha");
 	imprimeHash();
+	//imprimePilha();
 }
 
 yyerror (void){
