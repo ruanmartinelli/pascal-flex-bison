@@ -1,18 +1,94 @@
 %{
 #include <stdio.h>
-#include<string.h>
+#include <string.h>
+#include <stdlib.h>
 
 typedef struct Hash Hash;
-
 typedef struct Variavel Variavel;
+typedef struct Identificador Identificador;
 
-extern char* yytext;
+extern char* 	yytext;
+Hash* 			hash[977];
+Identificador* 	lista;
 
-Hash* inicializa();
+struct Hash{
+	Variavel* 		variavel;
+	struct Hash* 	prox;
+};
 
-void add(char* texto);
+struct Variavel{
+	char* nome;
+	char* tipo;
+	char* escopo;
+	//valor
+};
 
-Hash* hash[97];
+struct Identificador{
+	char* nome;
+	struct Identificador* prox;
+};
+
+
+void init(){
+	lista = (Identificador *) malloc (sizeof(Identificador));
+	lista->prox = NULL;
+}
+
+int h(char* nome){
+	int i,
+		soma = 0;
+	for(i = 0; i < strlen(nome) ; i++){
+		soma = soma + nome[i];
+	}
+	return soma;
+}
+
+void insereHash(char* nome, char* tipo){
+	int tamanhoNome 		= strlen(nome);
+	int tamanhoTipo 		= strlen(tipo);
+	Hash* novo 				= (Hash*)		malloc(sizeof(Hash));
+	novo->variavel 			= (Variavel*)	malloc(sizeof(Variavel));
+	novo->variavel->nome 	= (char*)		malloc(sizeof(char)*tamanhoNome);
+	novo->variavel->tipo 	= (char*)		malloc(sizeof(char)*tamanhoTipo);
+	strcpy					(novo->variavel->nome, nome);
+	strcpy					(novo->variavel->tipo, tipo);
+	int indice 				= h(nome);
+	hash[indice] 			= novo;
+	//printf("Inseri: %s no Indice: %d\n", hash[indice]->variavel->nome, indice);
+}
+
+void insereIdentificadores(char* nome){
+	int tamanho 			= strlen(nome);
+	Identificador* novo 	= (Identificador *)malloc(sizeof(Identificador));
+	novo->nome 				= (char *)malloc((tamanho+1)*sizeof(char));
+	strcpy					(novo->nome, nome);
+	h 						(nome);
+	novo->prox 				= lista;
+	lista					= novo;
+}
+
+void adicionaListaTabela(char* tipo){
+	Identificador* id;
+	for(id = lista; id != NULL ; id = id->prox){
+		if(id->nome != NULL){
+			insereHash 			(id->nome, tipo);
+		}
+		Identificador* aux 	= (Identificador*)malloc(sizeof(Identificador));
+		aux 				= lista->prox;
+		free 				(lista);
+		lista 				= aux;
+	}
+}
+
+void imprimeHash(){
+	int i;
+	for(i = 0 ; i < 977 ; i++){
+		if(hash[i] != NULL)
+		{
+			printf("%s	-	%s\n", hash[i]->variavel->nome, hash[i]->variavel->tipo);
+		}
+	}
+}
 
 %}
 
@@ -113,7 +189,7 @@ Hash* hash[97];
 PROG: 					CABECALHO BLOCO tk_ponto 
 ;
 
-CABECALHO: 				tk_program tk_identificador tk_pontoEVirgula 
+CABECALHO: 				tk_program tk_identificador {} tk_pontoEVirgula 
 ;
 
 /* Bloco agrega todos os demais componentes do programa */
@@ -129,22 +205,22 @@ BLOCO: 					VARIAVEIS BLOCO
 /* Declaracao inicial das variaveis. */
 VARIAVEIS: 				tk_var DECLARACAO_VARIAVEIS
 ;						//a, b
-DECLARACAO_VARIAVEIS: 	LISTA_VARIAVEIS tk_doisPontos TIPO {printf("%s\n", yytext);} tk_pontoEVirgula
+DECLARACAO_VARIAVEIS: 	LISTA_VARIAVEIS tk_doisPontos TIPO {} tk_pontoEVirgula
 						| DECLARACAO_VARIAVEIS LISTA_VARIAVEIS tk_doisPontos TIPO tk_pontoEVirgula
 ;
-LISTA_VARIAVEIS: 		tk_identificador {}
-						| LISTA_VARIAVEIS tk_virgula tk_identificador {add(yytext);}
+LISTA_VARIAVEIS: 		tk_identificador {insereIdentificadores(yytext);}
+						| LISTA_VARIAVEIS tk_virgula tk_identificador {insereIdentificadores(yytext);}
 ;
 /* Vetores ou tipo */
-TIPO: 					TIPO_PADRAO
-						| tk_array tk_abreColchete DIMENSAO_LISTA tk_fechaColchete tk_of TIPO_PADRAO
+TIPO: 					TIPO_PADRAO {adicionaListaTabela(yytext);}
+						| tk_array tk_abreColchete DIMENSAO_LISTA tk_fechaColchete tk_of TIPO_PADRAO {adicionaListaTabela(yytext);}
 ;
 
 DIMENSAO_LISTA:			DIMENSAO 	
 						| DIMENSAO_LISTA tk_virgula DIMENSAO
 ;
 DIMENSAO: 				tk_numeroInteiro tk_pontoPonto tk_numeroInteiro ;
-TIPO_PADRAO: 			tk_integer
+TIPO_PADRAO: 			tk_integer {}
 						| tk_char
 						| tk_boolean
 						| tk_real
@@ -283,46 +359,10 @@ ADDOP: 					tk_mais
 #include "lex.yy.c"
 #define HASHSIZE 97
 
-struct Hash{
-	Variavel* 		variavel;
-	struct Hash* 	prox;
-	
-};
-
-struct Variavel{
-	char* nome;
-	char* tipo;
-	char* escopo;
-	//valor tipo
-};
-
-Hash* inicializa(){
-	Hash* h = (Hash*)malloc(sizeof(Hash));
-
-	//int i;
-	//for( i = 0 ; i < HASHSIZE ; i++ ){
-		h->variavel = (Variavel*)malloc(50*sizeof(Variavel));
-		h->variavel->nome = (char*)malloc(50*sizeof(char));
-		h->prox 	= NULL;
-	//}
-	return h;
-}
-
-void add(char* texto){
-	hash[0] = (Hash*)malloc(sizeof(Hash));
-	hash[0]->variavel = (Variavel*)malloc(50*sizeof(Variavel));
-	hash[0]->variavel->nome = (char*)malloc(50*sizeof(char));
-	strcpy(hash[0]->variavel->nome,texto);
-}
-
-
 main(){
-	//hash[0] = inicializa();
-	//hash[0]->variavel->nome = "d";
-	
+	init(); /* Inicializa Lista. */
 	yyparse();
-	printf("%s",hash[0]->variavel->nome);
-	
+	imprimeHash();
 }
 
 yyerror (void){
