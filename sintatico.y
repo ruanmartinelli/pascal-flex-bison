@@ -5,12 +5,12 @@
 
 typedef struct Hash Hash;
 typedef struct Variavel Variavel;
-typedef struct Identificador Identificador;
+typedef struct Lista Lista;
 typedef struct Pilha Pilha;
 
 extern char* 	yytext;
 Hash* 			hash[977];
-Identificador* 	lista;
+Lista* 	lista;
 Pilha* 			pilha;
 
 struct Pilha{
@@ -30,14 +30,14 @@ struct Variavel{
 	//valor
 };
 
-struct Identificador{
+struct Lista{
 	char* nome;
-	struct Identificador* prox;
+	struct Lista* prox;
 };
 
 
 void initLista(){
-	lista 		= (Identificador *) malloc (sizeof(Identificador));
+	lista 		= (Lista *) malloc (sizeof(Lista));
 	lista->prox = NULL;
 }
 
@@ -46,7 +46,7 @@ void initPilha(){
 	//pilha->nome = (char*) malloc (sizeof(char)*50);
 	//pilha->prox = NULL;
 	pilha 		= NULL;
-	pilha->prox = NULL;
+	//pilha->prox = NULL;
 }
 
 void pushEscopo(char* nome){
@@ -66,6 +66,11 @@ void popEscopo(){
 	free(aux);
 }
 
+char* getEscopo(){
+	if(pilha != NULL){
+		return pilha->nome;
+	}
+}
 
 int h(char* nome){
 	int i,
@@ -76,16 +81,19 @@ int h(char* nome){
 	return soma;
 }
 
-void insereHash(char* nome, char* tipo){
+void insereHash(char* nome, char* tipo, char* escopo){
 	int tamanhoNome 		= strlen(nome);
 	int tamanhoTipo 		= strlen(tipo);
+	int tamanhoEscopo		= strlen(escopo);
 	Hash* novo 				= (Hash*)		malloc(sizeof(Hash));
 	novo->variavel 			= (Variavel*)	malloc(sizeof(Variavel));
 	novo->variavel->nome 	= (char*)		malloc(sizeof(char)*tamanhoNome);
 	novo->variavel->tipo 	= (char*)		malloc(sizeof(char)*tamanhoTipo);
+	novo->variavel->escopo 	= (char*)		malloc(sizeof(char)*tamanhoEscopo);
 	novo->prox  			= NULL;
 	strcpy					(novo->variavel->nome, nome);
 	strcpy					(novo->variavel->tipo, tipo);
+	strcpy					(novo->variavel->escopo, escopo);
 	int indice 				= h(nome);
 
 	int add = 0;
@@ -102,7 +110,7 @@ void insereHash(char* nome, char* tipo){
 
 void insereIdentificadores(char* nome){
 	int tamanho 			= strlen(nome);
-	Identificador* novo 	= (Identificador *)malloc(sizeof(Identificador));
+	Lista* novo 	= (Lista *)malloc(sizeof(Lista));
 	novo->nome 				= (char *)malloc((tamanho+1)*sizeof(char));
 	strcpy					(novo->nome, nome);
 	h 						(nome);
@@ -110,13 +118,13 @@ void insereIdentificadores(char* nome){
 	lista					= novo;
 }
 
-void adicionaListaTabela(char* tipo){
-	Identificador* id;
+void adicionaListaTabela(char* tipo, char* escopo){
+	Lista* id;
 	for(id = lista; id != NULL ; id = id->prox){
 		if(id->nome != NULL){
-			insereHash 			(id->nome, tipo);
+			insereHash 			(id->nome, tipo, escopo);
 		}
-		Identificador* aux 	= (Identificador*)malloc(sizeof(Identificador));
+		Lista* aux 	= (Lista*)malloc(sizeof(Lista));
 		aux 				= lista->prox;
 		free 				(lista);
 		lista 				= aux;
@@ -125,11 +133,12 @@ void adicionaListaTabela(char* tipo){
 
 void imprimeHash(){
 	int i;
+	printf("Tabela de Variaveis:\n");
 	for(i = 0 ; i < 977 ; i++){
 		if(hash[i] != NULL){
 			Hash* aux;
 			for(aux = hash[i] ; aux != NULL; aux = aux->prox){
-				printf("%s	-	%s\n", aux->variavel->nome, aux->variavel->tipo);
+				printf("%s		-		%s		- 		%s\n", aux->variavel->nome, aux->variavel->escopo, aux->variavel->tipo);
 			}
 		}
 	}
@@ -138,11 +147,10 @@ void imprimeHash(){
 void imprimePilha(){
 	int i;
 	Pilha* p;
-	printf("Pilha: \n");
+	printf("Pilha de Escopo: \n");
 	for(p = pilha; p!= NULL; p = p->prox){
 		printf("%s\n", p->nome);
 	}
-	printf("Sai do for");
 }
 
 %}
@@ -244,7 +252,7 @@ void imprimePilha(){
 PROG: 					CABECALHO BLOCO tk_ponto 
 ;
 
-CABECALHO: 				tk_program tk_identificador {} tk_pontoEVirgula 
+CABECALHO: 				tk_program tk_identificador {pushEscopo(yytext);} tk_pontoEVirgula 
 ;
 
 /* Bloco agrega todos os demais componentes do programa */
@@ -258,7 +266,7 @@ BLOCO: 					VARIAVEIS BLOCO
 						| DECLARACAO_FUNCTION BLOCO 
 ;
 /* Declaracao inicial das variaveis. */
-VARIAVEIS: 				tk_var DECLARACAO_VARIAVEIS
+VARIAVEIS: 				tk_var DECLARACAO_VARIAVEIS {}
 ;						//a, b
 DECLARACAO_VARIAVEIS: 	LISTA_VARIAVEIS tk_doisPontos TIPO {} tk_pontoEVirgula
 						| DECLARACAO_VARIAVEIS LISTA_VARIAVEIS tk_doisPontos TIPO tk_pontoEVirgula
@@ -267,8 +275,8 @@ LISTA_VARIAVEIS: 		tk_identificador {insereIdentificadores(yytext);}
 						| LISTA_VARIAVEIS tk_virgula tk_identificador {insereIdentificadores(yytext);}
 ;
 /* Vetores ou tipo */
-TIPO: 					TIPO_PADRAO {adicionaListaTabela(yytext);}
-						| tk_array tk_abreColchete DIMENSAO_LISTA tk_fechaColchete tk_of TIPO_PADRAO {adicionaListaTabela(yytext);}
+TIPO: 					TIPO_PADRAO {char* escopo = getEscopo(); adicionaListaTabela(yytext, escopo);}
+						| tk_array tk_abreColchete DIMENSAO_LISTA tk_fechaColchete tk_of TIPO_PADRAO {char* escopo = getEscopo(); adicionaListaTabela(yytext, escopo);}
 ;
 
 DIMENSAO_LISTA:			DIMENSAO 	
@@ -282,9 +290,9 @@ TIPO_PADRAO: 			tk_integer {}
 ;
 /* Declaracao dos Procedures */
 DECLARACAO_PROCEDURE: 	CABECALHO_PROCEDURE BLOCO tk_pontoEVirgula
-						| CABECALHO_PROCEDURE tk_forward tk_pontoEVirgula
+						| CABECALHO_PROCEDURE tk_forward tk_pontoEVirgula {popEscopo();}
 ;
-CABECALHO_PROCEDURE: 	tk_procedure tk_identificador ARGUMENTOS tk_pontoEVirgula
+CABECALHO_PROCEDURE: 	tk_procedure tk_identificador {pushEscopo(yytext);} ARGUMENTOS tk_pontoEVirgula
 ;
 ARGUMENTOS: 			tk_abreParenteses LISTA_ARGUMENTOS tk_fechaParenteses
 						| tk_abreParenteses tk_fechaParenteses
@@ -297,14 +305,14 @@ LISTA_ARGUMENTOS: 		LISTA_VARIAVEIS tk_doisPontos TIPO
 
 /* Declaracao de Funcoes */
 DECLARACAO_FUNCTION: 	CABECALHO_FUNCTION BLOCO tk_pontoEVirgula 
-						| CABECALHO_FUNCTION tk_forward tk_pontoEVirgula
+						| CABECALHO_FUNCTION tk_forward tk_pontoEVirgula {popEscopo();}
 ;
-CABECALHO_FUNCTION: 	tk_function tk_identificador {/*escopo = yytext*/} ARGUMENTOS tk_doisPontos TIPO_PADRAO tk_pontoEVirgula
+CABECALHO_FUNCTION: 	tk_function tk_identificador {pushEscopo(yytext);} ARGUMENTOS tk_doisPontos TIPO_PADRAO tk_pontoEVirgula
 ;
 
 /* Corpo representa tudo que pode ser incluido dentro do escopo de um begin-end */
-CORPO: 					tk_begin CORPO_LISTA tk_end {}
-						| tk_begin tk_end
+CORPO: 					tk_begin CORPO_LISTA tk_end {popEscopo();}
+						| tk_begin tk_end {popEscopo();}
 ;
 CORPO_LISTA: 			DECLARACAO tk_pontoEVirgula
 						| DECLARACAO tk_pontoEVirgula CORPO_LISTA
@@ -416,12 +424,10 @@ ADDOP: 					tk_mais
 
 main(){
 	initLista(); /* Inicializa Lista. */
-	//initPilha();
-/* 	initHash(); */
+	initPilha();
 	yyparse();
-	//pushEscopo("haha");
 	imprimeHash();
-	//imprimePilha();
+	imprimePilha(); /* Deve sempre imprimir vazio. */
 }
 
 yyerror (void){
