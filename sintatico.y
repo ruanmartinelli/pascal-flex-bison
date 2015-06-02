@@ -5,22 +5,40 @@
 
 typedef struct Hash Hash;
 typedef struct Variavel Variavel;
+typedef struct Funcao Funcao;
 typedef struct Lista Lista;
 typedef struct Pilha Pilha;
+typedef struct Dados Dados;
 
 extern char* 	yytext;
-Hash* 			hash[977];
-Lista* 	lista;
+Hash* 			variaveis[977];
+Hash*			funcoes[977];
+Lista* 			lista;
 Pilha* 			pilha;
+Dados*			dados;
+
+int aridade = 0;
 
 struct Pilha{
 	char* nome;
 	struct Pilha* prox;
 };
 
+struct Lista{
+	char* 			nome;
+	struct Lista* 	prox;
+};
+
 struct Hash{
 	Variavel* 		variavel;
+	Funcao* 		funcao;
 	struct Hash* 	prox;
+};
+
+struct Funcao{
+	char* 	nome;
+	char* 	escopo;
+	int 	aridade;
 };
 
 struct Variavel{
@@ -30,29 +48,35 @@ struct Variavel{
 	//valor
 };
 
-struct Lista{
+struct Dados{
 	char* nome;
-	struct Lista* prox;
+	//int aridade;
+	char* escopo;
 };
 
-
 void initLista(){
-	lista 		= (Lista *) malloc (sizeof(Lista));
-	lista->prox = NULL;
+	lista 	= NULL;
 }
 
 void initPilha(){
-	//pilha 		= (Pilha*) malloc (sizeof(Pilha));
-	//pilha->nome = (char*) malloc (sizeof(char)*50);
-	//pilha->prox = NULL;
-	pilha 		= NULL;
-	//pilha->prox = NULL;
+	pilha 	= NULL;
+}
+
+void initDados(){
+	dados 			= (Dados*)malloc(sizeof(Dados));
+	dados->nome 	= (char*)malloc(sizeof(char) *  50);
+	dados->escopo 	= (char*)malloc(sizeof(char) *  50);
+	//dados->aridade  = 0;
+}
+void liberaDados(){
+	free(dados->escopo);
+	free(dados->nome);
+	free(dados);
 }
 
 void pushEscopo(char* nome){
 	Pilha* novo = (Pilha*) malloc (sizeof(Pilha));
 	novo->nome  = (char*) malloc (sizeof(char)*50);
-	//novo->prox  = NULL;
 	strcpy		(novo->nome,nome);
 	novo->prox  = pilha;
 	pilha 		= novo;
@@ -60,10 +84,10 @@ void pushEscopo(char* nome){
 }
 
 void popEscopo(){
-	Pilha* aux = (Pilha*) malloc (sizeof(Pilha)); 
-	aux = pilha;
-	pilha = pilha->prox;
-	free(aux);
+	Pilha* aux 	= (Pilha*) malloc (sizeof(Pilha)); 
+	aux 		= pilha;
+	pilha 		= pilha->prox;
+	free 		(aux);
 }
 
 char* getEscopo(){
@@ -81,10 +105,32 @@ int h(char* nome){
 	return soma;
 }
 
-void insereHash(char* nome, char* tipo, char* escopo){
+void insereFuncoes(char* nome, int aridade, char* escopo){
 	int tamanhoNome 		= strlen(nome);
-	int tamanhoTipo 		= strlen(tipo);
 	int tamanhoEscopo		= strlen(escopo);
+	Hash* novo 				= (Hash*) 	malloc(sizeof(Hash));
+	novo->funcao 			= (Funcao*)	malloc(sizeof(Funcao));
+	novo->funcao->nome 		= (char*) 	malloc(sizeof(char)*tamanhoNome);
+	novo->funcao->escopo	= (char*) 	malloc(sizeof(char)*tamanhoEscopo);
+	novo->prox 				= NULL;
+	strcpy					(novo->funcao->nome, nome);
+	strcpy					(novo->funcao->escopo, escopo);
+	novo->funcao->aridade 	= aridade;
+
+	int indice 				= h(novo->funcao->nome);
+	if(funcoes[indice] == NULL){
+		funcoes[indice] = novo;
+	}else{
+		if(funcoes[indice] != NULL){
+			funcoes[indice]->prox = novo;
+		}
+	}
+}
+
+void insereVariaveis(char* nome, char* tipo, char* escopo){
+	int tamanhoNome 		= 				strlen(nome);
+	int tamanhoTipo 		= 				strlen(tipo);
+	int tamanhoEscopo		= 				strlen(escopo);
 	Hash* novo 				= (Hash*)		malloc(sizeof(Hash));
 	novo->variavel 			= (Variavel*)	malloc(sizeof(Variavel));
 	novo->variavel->nome 	= (char*)		malloc(sizeof(char)*tamanhoNome);
@@ -94,23 +140,20 @@ void insereHash(char* nome, char* tipo, char* escopo){
 	strcpy					(novo->variavel->nome, nome);
 	strcpy					(novo->variavel->tipo, tipo);
 	strcpy					(novo->variavel->escopo, escopo);
+	
 	int indice 				= h(nome);
-
-	int add = 0;
-	if(hash[indice] == NULL){
-		hash[indice] 		= novo;
-
+	if(variaveis[indice] == NULL){
+		variaveis[indice] = novo;
 	}else{
-		if(hash[indice] != NULL){
-			hash[indice]->prox 	= novo;
+		if(variaveis[indice] != NULL){
+			variaveis[indice]->prox = novo;
 		}
 	}
-	//printf("Inseri: %s no Indice: %d\n", hash[indice]->variavel->nome, indice);
 }
 
 void insereIdentificadores(char* nome){
 	int tamanho 			= strlen(nome);
-	Lista* novo 	= (Lista *)malloc(sizeof(Lista));
+	Lista* novo 			= (Lista *)malloc(sizeof(Lista));
 	novo->nome 				= (char *)malloc((tamanho+1)*sizeof(char));
 	strcpy					(novo->nome, nome);
 	h 						(nome);
@@ -122,34 +165,47 @@ void adicionaListaTabela(char* tipo, char* escopo){
 	Lista* id;
 	for(id = lista; id != NULL ; id = id->prox){
 		if(id->nome != NULL){
-			insereHash 			(id->nome, tipo, escopo);
+			insereVariaveis(id->nome, tipo, escopo);
 		}
 		Lista* aux 	= (Lista*)malloc(sizeof(Lista));
-		aux 				= lista->prox;
-		free 				(lista);
-		lista 				= aux;
+		aux 		= lista->prox;
+		free 		(lista);
+		lista 		= aux;
 	}
 }
 
-void imprimeHash(){
+void imprimeVariaveis(){
 	int i;
 	printf("Tabela de Variaveis:\n");
 	for(i = 0 ; i < 977 ; i++){
-		if(hash[i] != NULL){
+		if(variaveis[i] != NULL){
 			Hash* aux;
-			for(aux = hash[i] ; aux != NULL; aux = aux->prox){
-				printf("%s		-		%s		- 		%s\n", aux->variavel->nome, aux->variavel->escopo, aux->variavel->tipo);
+			for(aux = variaveis[i] ; aux != NULL; aux = aux->prox){
+				printf("	[%d] : %s		- %s		- %s\n", i, aux->variavel->nome, aux->variavel->escopo, aux->variavel->tipo);
+			}
+		}
+	}
+}
+
+void imprimeFuncoes(){
+	int i;
+	printf("Tabela de Funcoes:\n");
+	for(i = 0 ; i < 977 ; i++){
+		if(funcoes[i] != NULL){
+			Hash* aux;
+			for(aux = funcoes[i] ; aux != NULL; aux = aux->prox){
+				printf("	[%d] : %s		- %s		- %d\n", i, aux->funcao->nome, aux->funcao->escopo, aux->funcao->aridade);
 			}
 		}
 	}
 }
 
 void imprimePilha(){
-	int i;
-	Pilha* p;
+	int 	i;
+	Pilha* 	p;
 	printf("Pilha de Escopo: \n");
-	for(p = pilha; p!= NULL; p = p->prox){
-		printf("%s\n", p->nome);
+	for(p = pilha ; p!= NULL ; p = p->prox){
+		printf("	%s\n", p->nome);
 	}
 }
 
@@ -264,6 +320,8 @@ BLOCO: 					VARIAVEIS BLOCO
 						| CORPO BLOCO 
 						| DECLARACAO_FUNCTION 
 						| DECLARACAO_FUNCTION BLOCO 
+						| DECLARACAO_TYPE
+						| DECLARACAO_TYPE BLOCO
 ;
 /* Declaracao inicial das variaveis. */
 VARIAVEIS: 				tk_var DECLARACAO_VARIAVEIS {}
@@ -271,12 +329,16 @@ VARIAVEIS: 				tk_var DECLARACAO_VARIAVEIS {}
 DECLARACAO_VARIAVEIS: 	LISTA_VARIAVEIS tk_doisPontos TIPO {} tk_pontoEVirgula
 						| DECLARACAO_VARIAVEIS LISTA_VARIAVEIS tk_doisPontos TIPO tk_pontoEVirgula
 ;
-LISTA_VARIAVEIS: 		tk_identificador {insereIdentificadores(yytext);}
-						| LISTA_VARIAVEIS tk_virgula tk_identificador {insereIdentificadores(yytext);}
+LISTA_VARIAVEIS: 		tk_identificador 
+							{insereIdentificadores(yytext); aridade++;}
+						| LISTA_VARIAVEIS tk_virgula tk_identificador 
+							{insereIdentificadores(yytext);aridade++;}
 ;
 /* Vetores ou tipo */
-TIPO: 					TIPO_PADRAO {char* escopo = getEscopo(); adicionaListaTabela(yytext, escopo);}
-						| tk_array tk_abreColchete DIMENSAO_LISTA tk_fechaColchete tk_of TIPO_PADRAO {char* escopo = getEscopo(); adicionaListaTabela(yytext, escopo);}
+TIPO: 					TIPO_PADRAO 
+							{char* escopo = getEscopo(); adicionaListaTabela(yytext, escopo);}
+						| tk_array tk_abreColchete DIMENSAO_LISTA tk_fechaColchete tk_of TIPO_PADRAO 
+							{char* escopo = getEscopo(); adicionaListaTabela(yytext, escopo);}
 ;
 
 DIMENSAO_LISTA:			DIMENSAO 	
@@ -287,12 +349,28 @@ TIPO_PADRAO: 			tk_integer {}
 						| tk_char
 						| tk_boolean
 						| tk_real
+						| tk_abreParenteses LISTA_IDS tk_fechaParenteses;
 ;
+LISTA_IDS : tk_identificador | tk_identificador tk_virgula LISTA_IDS
+
+DECLARACAO_TYPE: 		tk_type LISTA_TYPE
+;
+LISTA_TYPE:				DEF_TYPE
+						| DEF_TYPE LISTA_TYPE
+;
+DEF_TYPE: 				tk_identificador tk_igual TIPO_PADRAO tk_pontoEVirgula
+;
+
 /* Declaracao dos Procedures */
 DECLARACAO_PROCEDURE: 	CABECALHO_PROCEDURE BLOCO tk_pontoEVirgula
 						| CABECALHO_PROCEDURE tk_forward tk_pontoEVirgula {popEscopo();}
 ;
-CABECALHO_PROCEDURE: 	tk_procedure tk_identificador {pushEscopo(yytext);} ARGUMENTOS tk_pontoEVirgula
+CABECALHO_PROCEDURE: 	tk_procedure 
+							{initDados(); char* escopo = getEscopo(); strcpy(dados->escopo, escopo); aridade = 0;} 
+						tk_identificador 
+							{strcpy(dados->nome, yytext); pushEscopo(yytext);} 
+						ARGUMENTOS tk_pontoEVirgula 
+							{insereFuncoes(dados->nome, aridade, dados->escopo); aridade = 0;}
 ;
 ARGUMENTOS: 			tk_abreParenteses LISTA_ARGUMENTOS tk_fechaParenteses
 						| tk_abreParenteses tk_fechaParenteses
@@ -307,7 +385,12 @@ LISTA_ARGUMENTOS: 		LISTA_VARIAVEIS tk_doisPontos TIPO
 DECLARACAO_FUNCTION: 	CABECALHO_FUNCTION BLOCO tk_pontoEVirgula 
 						| CABECALHO_FUNCTION tk_forward tk_pontoEVirgula {popEscopo();}
 ;
-CABECALHO_FUNCTION: 	tk_function tk_identificador {pushEscopo(yytext);} ARGUMENTOS tk_doisPontos TIPO_PADRAO tk_pontoEVirgula
+CABECALHO_FUNCTION: 	tk_function 
+							{initDados(); char* escopo = getEscopo(); strcpy(dados->escopo, escopo); aridade = 0;} 
+						tk_identificador 
+							{strcpy(dados->nome, yytext); pushEscopo(yytext);} 
+						ARGUMENTOS tk_doisPontos TIPO_PADRAO tk_pontoEVirgula 
+							{insereFuncoes(dados->nome, aridade, dados->escopo); aridade = 0;}
 ;
 
 /* Corpo representa tudo que pode ser incluido dentro do escopo de um begin-end */
@@ -425,9 +508,13 @@ ADDOP: 					tk_mais
 main(){
 	initLista(); /* Inicializa Lista. */
 	initPilha();
+	//initDados();
 	yyparse();
-	imprimeHash();
+	imprimeVariaveis();
 	imprimePilha(); /* Deve sempre imprimir vazio. */
+	imprimeFuncoes();
+	/*liberaHash()
+	liberaPilha()*/
 }
 
 yyerror (void){

@@ -19,3 +19,10 @@ run4:
 run5:
 	clear
 	./trab < Entradas/in5.pas
+
+teste:
+	clear
+	flex -i lexico.l
+	bison sintatico.y -v
+	gcc -otrab sintatico.tab.c -lfl
+	./trab < Entradas/in.pas
