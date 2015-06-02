@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 typedef struct Hash Hash;
 typedef struct Variavel Variavel;
@@ -11,6 +12,7 @@ typedef struct Pilha Pilha;
 typedef struct Dados Dados;
 
 extern char* 	yytext;
+extern int 		Nlinha;
 Hash* 			variaveis[977];
 Hash*			funcoes[977];
 Lista* 			lista;
@@ -39,6 +41,7 @@ struct Funcao{
 	char* 	nome;
 	char* 	escopo;
 	int 	aridade;
+	bool	forward;
 };
 
 struct Variavel{
@@ -52,6 +55,7 @@ struct Dados{
 	char* nome;
 	//int aridade;
 	char* escopo;
+	bool forward;
 };
 
 void initLista(){
@@ -105,13 +109,14 @@ int h(char* nome){
 	return soma;
 }
 
-void insereFuncoes(char* nome, int aridade, char* escopo){
+void insereFuncoes(char* nome, int aridade, char* escopo, bool forward){
 	int tamanhoNome 		= strlen(nome);
 	int tamanhoEscopo		= strlen(escopo);
 	Hash* novo 				= (Hash*) 	malloc(sizeof(Hash));
 	novo->funcao 			= (Funcao*)	malloc(sizeof(Funcao));
 	novo->funcao->nome 		= (char*) 	malloc(sizeof(char)*tamanhoNome);
 	novo->funcao->escopo	= (char*) 	malloc(sizeof(char)*tamanhoEscopo);
+	novo->funcao->forward	= forward;
 	novo->prox 				= NULL;
 	strcpy					(novo->funcao->nome, nome);
 	strcpy					(novo->funcao->escopo, escopo);
@@ -122,10 +127,23 @@ void insereFuncoes(char* nome, int aridade, char* escopo){
 		funcoes[indice] = novo;
 	}else{
 		if(funcoes[indice] != NULL){
-			funcoes[indice]->prox = novo;
+			Hash* p;
+			Hash* l;
+			for(p = funcoes[indice] ; p != NULL; p = p->prox){
+				if(strcmp(p->funcao->nome, novo->funcao->nome) == 0 && strcmp(p->funcao->escopo, novo->funcao->escopo) == 0){
+						printf("Erro semantico na linha %d. Funcao redeclarada.\n", Nlinha);
+						//if(p->prox != NULL){
+							//l = p;
+						//}
+						
+						exit(0);
+				}
+			}
+			p = novo;
 		}
 	}
 }
+
 
 void insereVariaveis(char* nome, char* tipo, char* escopo){
 	int tamanhoNome 		= 				strlen(nome);
@@ -146,7 +164,14 @@ void insereVariaveis(char* nome, char* tipo, char* escopo){
 		variaveis[indice] = novo;
 	}else{
 		if(variaveis[indice] != NULL){
-			variaveis[indice]->prox = novo;
+			Hash* p;
+			for(p = variaveis[indice] ; p != NULL; p = p->prox){
+				if(strcmp(p->variavel->nome, novo->variavel->nome) == 0	&& strcmp(p->variavel->escopo, novo->variavel->escopo) == 0){
+					printf("Erro semantico na linha %d. Variavel redeclarada.\n", Nlinha);
+					exit(0);
+				}
+			}
+			p = novo;
 		}
 	}
 }
@@ -194,7 +219,7 @@ void imprimeFuncoes(){
 		if(funcoes[i] != NULL){
 			Hash* aux;
 			for(aux = funcoes[i] ; aux != NULL; aux = aux->prox){
-				printf("	[%d] : %s		- %s		- %d\n", i, aux->funcao->nome, aux->funcao->escopo, aux->funcao->aridade);
+				printf("	[%d] : %s		- %s		-	 %d 	-	%d\n", i, aux->funcao->nome, aux->funcao->escopo, aux->funcao->aridade, aux->funcao->forward);
 			}
 		}
 	}
@@ -352,7 +377,7 @@ TIPO_PADRAO: 			tk_integer {}
 						| tk_abreParenteses LISTA_IDS tk_fechaParenteses;
 ;
 LISTA_IDS : tk_identificador | tk_identificador tk_virgula LISTA_IDS
-
+;
 DECLARACAO_TYPE: 		tk_type LISTA_TYPE
 ;
 LISTA_TYPE:				DEF_TYPE
@@ -362,15 +387,15 @@ DEF_TYPE: 				tk_identificador tk_igual TIPO_PADRAO tk_pontoEVirgula
 ;
 
 /* Declaracao dos Procedures */
-DECLARACAO_PROCEDURE: 	CABECALHO_PROCEDURE BLOCO tk_pontoEVirgula
-						| CABECALHO_PROCEDURE tk_forward tk_pontoEVirgula {popEscopo();}
+DECLARACAO_PROCEDURE: 	CABECALHO_PROCEDURE {insereFuncoes(dados->nome, aridade, dados->escopo, false); aridade = 0;} BLOCO tk_pontoEVirgula 
+						| CABECALHO_PROCEDURE {insereFuncoes(dados->nome, aridade, dados->escopo, true); aridade = 0;} tk_forward tk_pontoEVirgula {popEscopo();}
 ;
 CABECALHO_PROCEDURE: 	tk_procedure 
 							{initDados(); char* escopo = getEscopo(); strcpy(dados->escopo, escopo); aridade = 0;} 
 						tk_identificador 
 							{strcpy(dados->nome, yytext); pushEscopo(yytext);} 
 						ARGUMENTOS tk_pontoEVirgula 
-							{insereFuncoes(dados->nome, aridade, dados->escopo); aridade = 0;}
+							
 ;
 ARGUMENTOS: 			tk_abreParenteses LISTA_ARGUMENTOS tk_fechaParenteses
 						| tk_abreParenteses tk_fechaParenteses
@@ -382,15 +407,15 @@ LISTA_ARGUMENTOS: 		LISTA_VARIAVEIS tk_doisPontos TIPO
 ;
 
 /* Declaracao de Funcoes */
-DECLARACAO_FUNCTION: 	CABECALHO_FUNCTION BLOCO tk_pontoEVirgula 
-						| CABECALHO_FUNCTION tk_forward tk_pontoEVirgula {popEscopo();}
+DECLARACAO_FUNCTION: 	CABECALHO_FUNCTION {insereFuncoes(dados->nome, aridade, dados->escopo, false); aridade = 0;} BLOCO tk_pontoEVirgula 
+						| CABECALHO_FUNCTION {insereFuncoes(dados->nome, aridade, dados->escopo, true); aridade = 0;} tk_forward tk_pontoEVirgula {popEscopo();}
 ;
 CABECALHO_FUNCTION: 	tk_function 
 							{initDados(); char* escopo = getEscopo(); strcpy(dados->escopo, escopo); aridade = 0;} 
 						tk_identificador 
 							{strcpy(dados->nome, yytext); pushEscopo(yytext);} 
 						ARGUMENTOS tk_doisPontos TIPO_PADRAO tk_pontoEVirgula 
-							{insereFuncoes(dados->nome, aridade, dados->escopo); aridade = 0;}
+							
 ;
 
 /* Corpo representa tudo que pode ser incluido dentro do escopo de um begin-end */
