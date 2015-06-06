@@ -41,7 +41,7 @@ struct Funcao{
 	char* 	nome;
 	char* 	escopo;
 	int 	aridade;
-	bool	forward;
+	int		forward;
 };
 
 struct Variavel{
@@ -55,7 +55,7 @@ struct Dados{
 	char* nome;
 	//int aridade;
 	char* escopo;
-	bool forward;
+	int forward;
 };
 
 void initLista(){
@@ -109,7 +109,7 @@ int h(char* nome){
 	return soma;
 }
 
-void insereFuncoes(char* nome, int aridade, char* escopo, bool forward){
+void insereFuncoes(char* nome, int aridade, char* escopo, int forward){
 	int tamanhoNome 		= strlen(nome);
 	int tamanhoEscopo		= strlen(escopo);
 	Hash* novo 				= (Hash*) 	malloc(sizeof(Hash));
@@ -128,18 +128,20 @@ void insereFuncoes(char* nome, int aridade, char* escopo, bool forward){
 	}else{
 		if(funcoes[indice] != NULL){
 			Hash* p;
-			Hash* l;
-			for(p = funcoes[indice] ; p != NULL; p = p->prox){
-				if(strcmp(p->funcao->nome, novo->funcao->nome) == 0 && strcmp(p->funcao->escopo, novo->funcao->escopo) == 0){
-						printf("Erro semantico na linha %d. Funcao redeclarada.\n", Nlinha);
-						//if(p->prox != NULL){
-							//l = p;
-						//}
-						
-						exit(0);
+			Hash* anterior;
+
+			p = funcoes[indice];
+			while(p != NULL){
+				if(strcmp(p->funcao->nome, novo->funcao->nome) == 0 
+					&& strcmp(p->funcao->escopo, novo->funcao->escopo) == 0
+						&& p->funcao->forward == novo->funcao->forward){
+							printf("Erro semantico na linha %d. Funcao redeclarada.\n", Nlinha);
+							exit(0);
 				}
+				anterior = p;
+				p = p->prox;
 			}
-			p = novo;
+			anterior->prox = novo;
 		}
 	}
 }
@@ -165,13 +167,18 @@ void insereVariaveis(char* nome, char* tipo, char* escopo){
 	}else{
 		if(variaveis[indice] != NULL){
 			Hash* p;
-			for(p = variaveis[indice] ; p != NULL; p = p->prox){
-				if(strcmp(p->variavel->nome, novo->variavel->nome) == 0	&& strcmp(p->variavel->escopo, novo->variavel->escopo) == 0){
-					printf("Erro semantico na linha %d. Variavel redeclarada.\n", Nlinha);
-					exit(0);
+			Hash* anterior;
+			p = variaveis[indice];
+			while(p != NULL){
+				if(strcmp(p->variavel->nome, novo->variavel->nome) == 0 
+					&& strcmp(p->variavel->escopo, novo->variavel->escopo) == 0){
+						printf("Erro semantico na linha %d. Variavel redeclarada.\n", Nlinha);
+						exit(0);
 				}
+				anterior = p;
+				p = p->prox;
 			}
-			p = novo;
+			anterior->prox = novo;
 		}
 	}
 }
@@ -387,8 +394,8 @@ DEF_TYPE: 				tk_identificador tk_igual TIPO_PADRAO tk_pontoEVirgula
 ;
 
 /* Declaracao dos Procedures */
-DECLARACAO_PROCEDURE: 	CABECALHO_PROCEDURE {insereFuncoes(dados->nome, aridade, dados->escopo, false); aridade = 0;} BLOCO tk_pontoEVirgula 
-						| CABECALHO_PROCEDURE {insereFuncoes(dados->nome, aridade, dados->escopo, true); aridade = 0;} tk_forward tk_pontoEVirgula {popEscopo();}
+DECLARACAO_PROCEDURE: 	CABECALHO_PROCEDURE {insereFuncoes(dados->nome, aridade, dados->escopo, 0); aridade = 0;} BLOCO tk_pontoEVirgula 
+						| CABECALHO_PROCEDURE {insereFuncoes(dados->nome, aridade, dados->escopo, 1); aridade = 0;} tk_forward tk_pontoEVirgula {popEscopo();}
 ;
 CABECALHO_PROCEDURE: 	tk_procedure 
 							{initDados(); char* escopo = getEscopo(); strcpy(dados->escopo, escopo); aridade = 0;} 
@@ -407,8 +414,8 @@ LISTA_ARGUMENTOS: 		LISTA_VARIAVEIS tk_doisPontos TIPO
 ;
 
 /* Declaracao de Funcoes */
-DECLARACAO_FUNCTION: 	CABECALHO_FUNCTION {insereFuncoes(dados->nome, aridade, dados->escopo, false); aridade = 0;} BLOCO tk_pontoEVirgula 
-						| CABECALHO_FUNCTION {insereFuncoes(dados->nome, aridade, dados->escopo, true); aridade = 0;} tk_forward tk_pontoEVirgula {popEscopo();}
+DECLARACAO_FUNCTION: 	CABECALHO_FUNCTION {insereFuncoes(dados->nome, aridade, dados->escopo, 0); aridade = 0;} BLOCO tk_pontoEVirgula 
+						| CABECALHO_FUNCTION {insereFuncoes(dados->nome, aridade, dados->escopo, 1); aridade = 0;} tk_forward tk_pontoEVirgula {popEscopo();}
 ;
 CABECALHO_FUNCTION: 	tk_function 
 							{initDados(); char* escopo = getEscopo(); strcpy(dados->escopo, escopo); aridade = 0;} 
