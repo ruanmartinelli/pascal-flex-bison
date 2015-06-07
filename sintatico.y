@@ -1,4 +1,22 @@
 %{
+
+/*
+
+//TODO
+O Analisador Semântico visa verificar:
+• se as variáveis utilizadas foram declaradas; 	OK
+• se há variáveis redeclaradas;					OK
+• se há variáveis declaradas e não utilizadas;	
+• se os tipos associados às variáveis e ao valor associado são compatíveis.
+• se o número de argumentos (aridade) de uma função ou procedimento está correto.
+	PROBLEMA: quando a funcao/procedure possui parametros, nao consigo "pegar" o nome dela
+• se o tipo associado ao valor de retorno de uma função está correto.
+• se uma função tem retorno.
+• se os tipos associados aos argumentos de uma função ou procedimento estão corretos.
+• Se os limites dos vetores e matrizes estão corretos.
+
+*/
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -12,6 +30,7 @@ typedef struct Pilha Pilha;
 typedef struct Dados Dados;
 
 extern char* 	yytext;
+extern char*	id;
 extern int 		Nlinha;
 Hash* 			variaveis[977];
 Hash*			funcoes[977];
@@ -19,7 +38,9 @@ Lista* 			lista;
 Pilha* 			pilha;
 Dados*			dados;
 
-int aridade = 0;
+int aridade 		= 0;
+int qtdParametros 	= 0;
+//char* idFunc;
 
 struct Pilha{
 	char* nome;
@@ -206,6 +227,51 @@ void adicionaListaTabela(char* tipo, char* escopo){
 	}
 }
 
+void verificaVariavel(char* nome){
+	int i = 0;
+	char* escopo = getEscopo();
+	for(i = 0 ; i < 977 ; i++){
+		if(variaveis[i] != NULL){
+			Hash* aux;
+			for(aux = variaveis[i] ; aux != NULL; aux = aux->prox){
+				if(strcmp(aux->variavel->nome, nome) == 0
+					&& strcmp(aux->variavel->escopo, escopo) == 0){
+					return;
+				}
+			}
+		}
+	}
+			printf("Variavel nao encontrada na linha %d \n", Nlinha);
+			exit(0);
+}
+
+void verificaFuncao(char* nome, int qtdParametros){
+	int i = 0;
+	char* escopo = getEscopo();
+	printf("PROCURANDO: %s\n", nome);
+	for(i = 0 ; i < 977 ; i++){
+		if(funcoes[i] != NULL){
+			Hash* aux;
+			for(aux = funcoes[i] ; aux != NULL; aux = aux->prox){
+				if(strcmp(aux->funcao->nome, nome) == 0
+					&& strcmp(aux->funcao->escopo, escopo) == 0
+						&& aux->funcao->forward == 0){
+					if(aux->funcao->aridade != qtdParametros){
+						printf("Erro semantico na linha %d. Quantidade de parametros incorreta para a funcao.\n", Nlinha);
+						exit(0);
+					}
+
+
+					return;
+				}
+			}
+		}
+	}
+			printf("Funcao nao encontrada na linha %d \n", Nlinha);
+			exit(0);
+}
+
+/*Funcoes de imprimir*/
 void imprimeVariaveis(){
 	int i;
 	printf("Tabela de Variaveis:\n");
@@ -300,9 +366,8 @@ void imprimePilha(){
 
 %token tk_real
 %token tk_boolean
-
 %token tk_constString
-
+%token tk_identificador
 %token tk_vezes
 %token tk_mais
 %token tk_menos
@@ -311,7 +376,7 @@ void imprimePilha(){
 %token tk_elevado
 %token tk_numeroInteiro
 %token tk_numeroReal
-%token tk_identificador
+
 %token tk_caractere
 %token tk_igual
 %token tk_abreParenteses
@@ -349,14 +414,13 @@ BLOCO: 					VARIAVEIS BLOCO
 						| DECLARACAO_PROCEDURE 
 						| VARIAVEIS 	
 						| CORPO 
-						| CORPO BLOCO 
 						| DECLARACAO_FUNCTION 
 						| DECLARACAO_FUNCTION BLOCO 
 						| DECLARACAO_TYPE
 						| DECLARACAO_TYPE BLOCO
 ;
 /* Declaracao inicial das variaveis. */
-VARIAVEIS: 				tk_var DECLARACAO_VARIAVEIS {}
+VARIAVEIS: 				tk_var DECLARACAO_VARIAVEIS
 ;						//a, b
 DECLARACAO_VARIAVEIS: 	LISTA_VARIAVEIS tk_doisPontos TIPO {} tk_pontoEVirgula
 						| DECLARACAO_VARIAVEIS LISTA_VARIAVEIS tk_doisPontos TIPO tk_pontoEVirgula
@@ -376,12 +440,13 @@ TIPO: 					TIPO_PADRAO
 DIMENSAO_LISTA:			DIMENSAO 	
 						| DIMENSAO_LISTA tk_virgula DIMENSAO
 ;
-DIMENSAO: 				tk_numeroInteiro tk_pontoPonto tk_numeroInteiro ;
-TIPO_PADRAO: 			tk_integer {}
+DIMENSAO: 				tk_numeroInteiro tk_pontoPonto tk_numeroInteiro 
+;
+TIPO_PADRAO: 			tk_integer
 						| tk_char
 						| tk_boolean
 						| tk_real
-						| tk_abreParenteses LISTA_IDS tk_fechaParenteses;
+						| tk_abreParenteses LISTA_IDS tk_fechaParenteses
 ;
 LISTA_IDS : tk_identificador | tk_identificador tk_virgula LISTA_IDS
 ;
@@ -422,25 +487,24 @@ CABECALHO_FUNCTION: 	tk_function
 						tk_identificador 
 							{strcpy(dados->nome, yytext); pushEscopo(yytext);} 
 						ARGUMENTOS tk_doisPontos TIPO_PADRAO tk_pontoEVirgula 
-							
 ;
 
 /* Corpo representa tudo que pode ser incluido dentro do escopo de um begin-end */
 CORPO: 					tk_begin CORPO_LISTA tk_end {popEscopo();}
 						| tk_begin tk_end {popEscopo();}
 ;
-CORPO_LISTA: 			DECLARACAO tk_pontoEVirgula
-						| DECLARACAO tk_pontoEVirgula CORPO_LISTA
+CORPO_LISTA: 			 DECLARACAO tk_pontoEVirgula 
+						| DECLARACAO tk_pontoEVirgula CORPO_LISTA 
 ;
 
 /* Loops, atribuicoes, chamadas de procedimento */
-DECLARACAO: 			VARIAVEL_DECLARACAO
+DECLARACAO: 			VARIAVEL_DECLARACAO 
 						| IF_DECLARACAO
 						| WHILE_DECLARACAO
 						| FOR_DECLARACAO
 						| REPEAT_DECLARACAO
 						| CASE_DECLARACAO
-						| PROCEDURES_CHAMADA
+						| PROCEDURES_CHAMADA 
 ;
 VARIAVEL_DECLARACAO: 	VARIAVEL tk_atribuicao EXPRESSAO
 ;
@@ -483,21 +547,22 @@ CONSTANTE:				tk_numeroReal
 ;
 
 /* Chamadas de Funcao e Procedures */
-PROCEDURES_CHAMADA: 	tk_identificador tk_abreParenteses EXPRESSAO_LISTA tk_fechaParenteses
-						| tk_identificador tk_abreParenteses tk_fechaParenteses
+PROCEDURES_CHAMADA: 	tk_identificador {initDados(); strcpy(dados->nome,id); qtdParametros = 0;} PARAMS
 ;
-FUNCAO_CHAMADA: 		tk_identificador tk_abreParenteses EXPRESSAO_LISTA tk_fechaParenteses
-						| tk_identificador tk_abreParenteses tk_fechaParenteses
-;
-EXPRESSAO_LISTA : 		EXPRESSAO
-						| EXPRESSAO_LISTA tk_virgula EXPRESSAO
+FUNCAO_CHAMADA: 		tk_identificador {initDados(); strcpy(dados->nome,id);qtdParametros = 0;} PARAMS;
+
+PARAMS: tk_abreParenteses {qtdParametros = 0;} EXPRESSAO_LISTA {verificaFuncao(dados->nome,qtdParametros);} tk_fechaParenteses
+		| tk_abreParenteses {verificaFuncao(dados->nome,qtdParametros);} tk_fechaParenteses
+
+EXPRESSAO_LISTA : 		EXPRESSAO {qtdParametros++;}
+						| EXPRESSAO_LISTA tk_virgula EXPRESSAO {qtdParametros++;}
 ;
 
 /* Continuacao das Variaveis*/
-VARIAVEL: 				tk_identificador
-	| 					tk_identificador tk_abreColchete EXPRESSAO_LISTA tk_fechaColchete
+VARIAVEL: 				 tk_identificador {verificaVariavel(id);}
+						| tk_identificador {verificaVariavel(id);} tk_abreColchete EXPRESSAO_LISTA tk_fechaColchete
 ;
-EXPRESSAO: 				EXPRESSAO_SIMPLES
+EXPRESSAO: 				EXPRESSAO_SIMPLES 
 						| EXPRESSAO_SIMPLES tk_igual EXPRESSAO_SIMPLES
 						| EXPRESSAO_SIMPLES tk_diferenteDe EXPRESSAO_SIMPLES
 						| EXPRESSAO_SIMPLES tk_maiorQue EXPRESSAO_SIMPLES
@@ -512,11 +577,11 @@ EXPRESSAO_SIMPLES: 		TERMO
 TERMO: 					FATOR
 						| TERMO MULOP FATOR
 ;
-FATOR: 					VARIAVEL
+FATOR: 					VARIAVEL 
 						| CONSTANTE
 						| tk_abreParenteses EXPRESSAO tk_fechaParenteses 
 						| ADDOP FATOR
-						| FUNCAO_CHAMADA
+						| FUNCAO_CHAMADA 
 						| tk_constString
 ;
 MULOP:

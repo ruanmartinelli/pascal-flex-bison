@@ -1,6 +1,8 @@
 %{
+#include <string.h>
 int Nlinha = 1;
 void contaEnter(char* comentario);
+char* id ;
 %}
 
 %%
@@ -68,8 +70,8 @@ real 								{return tk_real;}
 "{"[^}]*"}"							{contaEnter(yytext);}	
 "//".*\n							{Nlinha++;}
 
-
-L?\"(\\.|[^\\"])*\"						{return tk_constString;}
+[a-zA-Z][a-zA-Z0-9]*				{id = (char*)malloc(sizeof(char)*255); strcpy(id,yytext); return tk_identificador;}
+L?\"(\\.|[^\\"])*\"					{return tk_constString;}
 
 "*"									{return tk_vezes;}
 "+"									{return tk_mais;}
@@ -78,9 +80,8 @@ L?\"(\\.|[^\\"])*\"						{return tk_constString;}
 "%"									{return tk_restoDivisaoInteira;}
 "^"									{return tk_elevado;}
 [0-9]+      						{return tk_numeroInteiro;}
-"'"[a-zA-Z]"'"							{return tk_caractere;} 
+"'"[a-zA-Z]"'"						{return tk_caractere;} 
 [0-9]+\.[0-9]+("E"[0-9]+)?			{return tk_numeroReal;}
-[a-zA-Z][a-zA-Z0-9]*				{return tk_identificador;}
 
 "="									{return tk_igual;} 
 "("									{return tk_abreParenteses;}
@@ -100,7 +101,6 @@ L?\"(\\.|[^\\"])*\"						{return tk_constString;}
 ":="								{return tk_atribuicao;}
 "."									{return tk_ponto;}
 ".."								{return tk_pontoPonto;}
-
 [ \t]								;
 
 
