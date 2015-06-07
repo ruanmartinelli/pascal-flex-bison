@@ -4,14 +4,20 @@
 
 //TODO
 O Analisador Semântico visa verificar:
-• se as variáveis utilizadas foram declaradas; 	OK
-• se há variáveis redeclaradas;					OK
+• se as variáveis utilizadas foram declaradas; 										OK
+• se há variáveis redeclaradas;														OK
+
+
+	OBS: Está considerando variáveis de um func ou proc declarados em Forward como "redeclarado"
+			Fazer flag Forward
+			Funcao de Verificacao diferenciada
+
+
 • se há variáveis declaradas e não utilizadas;	
 • se os tipos associados às variáveis e ao valor associado são compatíveis.
-• se o número de argumentos (aridade) de uma função ou procedimento está correto.
-	PROBLEMA: quando a funcao/procedure possui parametros, nao consigo "pegar" o nome dela
+• se o número de argumentos (aridade) de uma função ou procedimento está correto. 	OK
 • se o tipo associado ao valor de retorno de uma função está correto.
-• se uma função tem retorno.
+• se uma função tem retorno. 														OK
 • se os tipos associados aos argumentos de uma função ou procedimento estão corretos.
 • Se os limites dos vetores e matrizes estão corretos.
 
@@ -40,6 +46,9 @@ Dados*			dados;
 
 int aridade 		= 0;
 int qtdParametros 	= 0;
+bool verificar 			= false;
+bool encontrouRetorno 	= false;
+
 //char* idFunc;
 
 struct Pilha{
@@ -77,6 +86,7 @@ struct Dados{
 	//int aridade;
 	char* escopo;
 	int forward;
+	char* tipo;
 };
 
 void initLista(){
@@ -91,6 +101,7 @@ void initDados(){
 	dados 			= (Dados*)malloc(sizeof(Dados));
 	dados->nome 	= (char*)malloc(sizeof(char) *  50);
 	dados->escopo 	= (char*)malloc(sizeof(char) *  50);
+	dados->tipo 	= (char*)malloc(sizeof(char) *  50);
 	//dados->aridade  = 0;
 }
 void liberaDados(){
@@ -194,7 +205,7 @@ void insereVariaveis(char* nome, char* tipo, char* escopo){
 				if(strcmp(p->variavel->nome, novo->variavel->nome) == 0 
 					&& strcmp(p->variavel->escopo, novo->variavel->escopo) == 0){
 						printf("Erro semantico na linha %d. Variavel redeclarada.\n", Nlinha);
-						exit(0);
+						//exit(0);
 				}
 				anterior = p;
 				p = p->prox;
@@ -248,7 +259,7 @@ void verificaVariavel(char* nome){
 void verificaFuncao(char* nome, int qtdParametros){
 	int i = 0;
 	char* escopo = getEscopo();
-	printf("PROCURANDO: %s\n", nome);
+	//printf("PROCURANDO: %s\n", nome);
 	for(i = 0 ; i < 977 ; i++){
 		if(funcoes[i] != NULL){
 			Hash* aux;
@@ -260,8 +271,6 @@ void verificaFuncao(char* nome, int qtdParametros){
 						printf("Erro semantico na linha %d. Quantidade de parametros incorreta para a funcao.\n", Nlinha);
 						exit(0);
 					}
-
-
 					return;
 				}
 			}
@@ -269,6 +278,19 @@ void verificaFuncao(char* nome, int qtdParametros){
 	}
 			printf("Funcao nao encontrada na linha %d \n", Nlinha);
 			exit(0);
+}
+
+void verificaRetorno(char* nome, char* escopo){
+	if(verificar && strcmp(nome,escopo) == 0){
+		encontrouRetorno = true;
+	}
+}
+
+void lancaErroRetorno(char* nome){
+	if(!encontrouRetorno){
+		printf("Funcao %s nao possui retorno.\n", nome);
+		exit(0);
+	}
 }
 
 /*Funcoes de imprimir*/
@@ -479,14 +501,22 @@ LISTA_ARGUMENTOS: 		LISTA_VARIAVEIS tk_doisPontos TIPO
 ;
 
 /* Declaracao de Funcoes */
-DECLARACAO_FUNCTION: 	CABECALHO_FUNCTION {insereFuncoes(dados->nome, aridade, dados->escopo, 0); aridade = 0;} BLOCO tk_pontoEVirgula 
-						| CABECALHO_FUNCTION {insereFuncoes(dados->nome, aridade, dados->escopo, 1); aridade = 0;} tk_forward tk_pontoEVirgula {popEscopo();}
+DECLARACAO_FUNCTION: 	CABECALHO_FUNCTION 
+												{insereFuncoes(dados->nome, aridade, dados->escopo, 0); insereVariaveis(dados->nome, dados->tipo, dados->nome); aridade = 0; verificar = true; encontrouRetorno = false;} 
+						BLOCO 
+												{verificar = false; lancaErroRetorno(dados->nome);} 
+						tk_pontoEVirgula 
+						| CABECALHO_FUNCTION 
+												{insereFuncoes(dados->nome, aridade, dados->escopo, 1); insereVariaveis(dados->nome,dados->tipo,dados->escopo); aridade = 0;} 
+						tk_forward tk_pontoEVirgula 
+												{popEscopo();}
 ;
 CABECALHO_FUNCTION: 	tk_function 
-							{initDados(); char* escopo = getEscopo(); strcpy(dados->escopo, escopo); aridade = 0;} 
+												{initDados(); char* escopo = getEscopo(); strcpy(dados->escopo, escopo); aridade = 0;} 
 						tk_identificador 
-							{strcpy(dados->nome, yytext); pushEscopo(yytext);} 
-						ARGUMENTOS tk_doisPontos TIPO_PADRAO tk_pontoEVirgula 
+												{strcpy(dados->nome, yytext); pushEscopo(yytext);} 
+						ARGUMENTOS tk_doisPontos TIPO_PADRAO 
+												{strcpy(dados->tipo,yytext);} tk_pontoEVirgula 
 ;
 
 /* Corpo representa tudo que pode ser incluido dentro do escopo de um begin-end */
@@ -506,7 +536,7 @@ DECLARACAO: 			VARIAVEL_DECLARACAO
 						| CASE_DECLARACAO
 						| PROCEDURES_CHAMADA 
 ;
-VARIAVEL_DECLARACAO: 	VARIAVEL tk_atribuicao EXPRESSAO
+VARIAVEL_DECLARACAO: 	VARIAVEL {char* escopo = getEscopo(); verificaRetorno(id,escopo);} tk_atribuicao EXPRESSAO
 ;
 
 /* If */
@@ -617,19 +647,3 @@ main(){
 yyerror (void){
 	printf("Erro na Linha: %d\n", Nlinha);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
