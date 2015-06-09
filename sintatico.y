@@ -5,21 +5,14 @@
 //TODO
 O Analisador Semântico visa verificar:
 • se as variáveis utilizadas foram declaradas; 										OK
-• se há variáveis redeclaradas;														OK
-
-
-	OBS: Está considerando variáveis de um func ou proc declarados em Forward como "redeclarado"
-			Fazer flag Forward
-			Funcao de Verificacao diferenciada
-
-
-• se há variáveis declaradas e não utilizadas;	
+• se há variáveis redeclaradas;														OK - TESTAR
+• se há variáveis declaradas e não utilizadas;										OK
 • se os tipos associados às variáveis e ao valor associado são compatíveis.
 • se o número de argumentos (aridade) de uma função ou procedimento está correto. 	OK
 • se o tipo associado ao valor de retorno de uma função está correto.
 • se uma função tem retorno. 														OK
 • se os tipos associados aos argumentos de uma função ou procedimento estão corretos.
-• Se os limites dos vetores e matrizes estão corretos.
+• Se os limites dos vetores e matrizes estão corretos.				ARMAZENANDO DIMENSOES, FALTA VERIFICAR
 
 */
 
@@ -30,6 +23,7 @@ O Analisador Semântico visa verificar:
 
 typedef struct Hash Hash;
 typedef struct Variavel Variavel;
+typedef struct Dimensao Dimensao;
 typedef struct Funcao Funcao;
 typedef struct Lista Lista;
 typedef struct Pilha Pilha;
@@ -43,11 +37,17 @@ Hash*			funcoes[977];
 Lista* 			lista;
 Pilha* 			pilha;
 Dados*			dados;
+Dimensao*		dimensoes;
 
 int aridade 		= 0;
 int qtdParametros 	= 0;
+int dim 			= 0;
+int ini 			= 0, 
+	fim 			= 0;
 bool verificar 			= false;
 bool encontrouRetorno 	= false;
+bool emCorpo 			= false;
+bool ehVetor			= false;
 
 //char* idFunc;
 
@@ -78,12 +78,21 @@ struct Variavel{
 	char* nome;
 	char* tipo;
 	char* escopo;
+	int forward;
+	bool utilizada;
+	Dimensao* dimensoes;
+	int dimensao;
 	//valor
+};
+
+struct Dimensao{
+	int inicio;
+	int fim;
+	struct Dimensao* prox;
 };
 
 struct Dados{
 	char* nome;
-	//int aridade;
 	char* escopo;
 	int forward;
 	char* tipo;
@@ -97,6 +106,15 @@ void initPilha(){
 	pilha 	= NULL;
 }
 
+void initDimensao(){
+	dimensoes = NULL;
+	//dimensoes = (Dimensao*)malloc(sizeof(Dimensao));
+}
+
+void liberaDimensao(){
+	free(dimensoes);
+}
+
 void initDados(){
 	dados 			= (Dados*)malloc(sizeof(Dados));
 	dados->nome 	= (char*)malloc(sizeof(char) *  50);
@@ -104,6 +122,7 @@ void initDados(){
 	dados->tipo 	= (char*)malloc(sizeof(char) *  50);
 	//dados->aridade  = 0;
 }
+
 void liberaDados(){
 	free(dados->escopo);
 	free(dados->nome);
@@ -132,6 +151,9 @@ char* getEscopo(){
 	}
 }
 
+Variavel* getVariaveisFuncao(char* escopo){}
+
+
 int h(char* nome){
 	int i,
 		soma = 0;
@@ -139,6 +161,41 @@ int h(char* nome){
 		soma = soma + nome[i];
 	}
 	return soma;
+}
+
+/*From: http://www.programmingsimplified.com/c/source-code/c-program-convert-string-to-integer-without-using-atoi-function*/
+int toInt(char a[]) {
+  int c, sign, offset, n;
+ 
+  if (a[0] == '-') {  
+    sign = -1;
+  }
+  if (sign == -1) {
+    offset = 1;
+  }
+  else {
+    offset = 0;
+  }
+  n = 0;
+  for (c = offset; a[c] != '\0'; c++) {
+    n = n * 10 + a[c] - '0';
+  }
+  if (sign == -1) {
+    n = -n;
+  }
+  return n;
+}
+
+void insereDimensoes(int ini, int fim){
+		Dimensao* novo = (Dimensao*)malloc(sizeof(Dimensao));
+		novo->inicio = ini;
+		novo->fim = fim;
+		//novo->prox = NULL;
+	//if(dimensoes != NULL){
+		novo->prox = dimensoes;
+		dimensoes = novo;
+	//}
+
 }
 
 void insereFuncoes(char* nome, int aridade, char* escopo, int forward){
@@ -179,7 +236,7 @@ void insereFuncoes(char* nome, int aridade, char* escopo, int forward){
 }
 
 
-void insereVariaveis(char* nome, char* tipo, char* escopo){
+void insereVariaveis(char* nome, char* tipo, char* escopo, Dimensao* dim){
 	int tamanhoNome 		= 				strlen(nome);
 	int tamanhoTipo 		= 				strlen(tipo);
 	int tamanhoEscopo		= 				strlen(escopo);
@@ -188,6 +245,10 @@ void insereVariaveis(char* nome, char* tipo, char* escopo){
 	novo->variavel->nome 	= (char*)		malloc(sizeof(char)*tamanhoNome);
 	novo->variavel->tipo 	= (char*)		malloc(sizeof(char)*tamanhoTipo);
 	novo->variavel->escopo 	= (char*)		malloc(sizeof(char)*tamanhoEscopo);
+	novo->variavel->dimensoes = (Dimensao*)malloc(sizeof(Dimensao));
+	novo->variavel->dimensoes = dim;
+
+	//printf("Dimensao %d..%d\n",dimensao->inicio, dimensao->fim );
 	novo->prox  			= NULL;
 	strcpy					(novo->variavel->nome, nome);
 	strcpy					(novo->variavel->tipo, tipo);
@@ -204,6 +265,24 @@ void insereVariaveis(char* nome, char* tipo, char* escopo){
 			while(p != NULL){
 				if(strcmp(p->variavel->nome, novo->variavel->nome) == 0 
 					&& strcmp(p->variavel->escopo, novo->variavel->escopo) == 0){
+
+					/*	Caso encontre uma variavel igual, 
+						vê se ela foi declarada
+						em uma funcao do tipo forward 
+						antes de acusar como redeclarada
+					*/
+					Hash* f;
+					int j = 0;
+					for(j = 0 ; j < 977 ; j++){
+						for(f = funcoes[j] ; f != NULL ; f = f->prox){
+							if(strcmp(p->variavel->escopo, f->funcao->nome) == 0
+								&& f->funcao->forward == 1){
+								return;
+							}
+						}
+						
+					}
+
 						printf("Erro semantico na linha %d. Variavel redeclarada.\n", Nlinha);
 						//exit(0);
 				}
@@ -225,11 +304,11 @@ void insereIdentificadores(char* nome){
 	lista					= novo;
 }
 
-void adicionaListaTabela(char* tipo, char* escopo){
+void adicionaListaTabela(char* tipo, char* escopo, Dimensao* dim){
 	Lista* id;
 	for(id = lista; id != NULL ; id = id->prox){
 		if(id->nome != NULL){
-			insereVariaveis(id->nome, tipo, escopo);
+			insereVariaveis(id->nome, tipo, escopo, dim);
 		}
 		Lista* aux 	= (Lista*)malloc(sizeof(Lista));
 		aux 		= lista->prox;
@@ -239,6 +318,7 @@ void adicionaListaTabela(char* tipo, char* escopo){
 }
 
 void verificaVariavel(char* nome){
+
 	int i = 0;
 	char* escopo = getEscopo();
 	for(i = 0 ; i < 977 ; i++){
@@ -248,12 +328,59 @@ void verificaVariavel(char* nome){
 				if(strcmp(aux->variavel->nome, nome) == 0
 					&& strcmp(aux->variavel->escopo, escopo) == 0){
 					return;
+				}else{
 				}
 			}
 		}
 	}
 			printf("Variavel nao encontrada na linha %d \n", Nlinha);
 			exit(0);
+}
+
+bool verificaVetor(char* nome){
+
+
+}
+
+void setVarUtilizada(char* nome){
+
+	int i = 0;
+	char* escopo = getEscopo();
+	for(i = 0 ; i < 977 ; i++){
+		if(variaveis[i] != NULL){
+			Hash* aux;
+			for(aux = variaveis[i] ; aux != NULL; aux = aux->prox){
+				if(strcmp(aux->variavel->nome, nome) == 0
+					&& strcmp(aux->variavel->escopo, escopo) == 0){
+
+						if(emCorpo){
+							aux->variavel->utilizada = true;
+						}
+						if(!emCorpo){
+							aux->variavel->utilizada =false;
+						}
+
+
+				}else{
+				}
+			}
+		}
+	}
+}
+
+void lancaErroNaoUtilizadas(){
+	int i = 0;
+	char* escopo = getEscopo();
+	for(i = 0 ; i < 977 ; i++){
+		if(variaveis[i] != NULL){
+			Hash* aux;
+			for(aux = variaveis[i] ; aux != NULL; aux = aux->prox){
+				if(!aux->variavel->utilizada){
+					printf("Erro semantico em %s. Variavel %s nao utilizada.\n", aux->variavel->escopo, aux->variavel->nome);
+				}
+			}
+		}
+	}
 }
 
 void verificaFuncao(char* nome, int qtdParametros){
@@ -301,7 +428,13 @@ void imprimeVariaveis(){
 		if(variaveis[i] != NULL){
 			Hash* aux;
 			for(aux = variaveis[i] ; aux != NULL; aux = aux->prox){
-				printf("	[%d] : %s		- %s		- %s\n", i, aux->variavel->nome, aux->variavel->escopo, aux->variavel->tipo);
+				printf("	[%d] : %s		- %s		- %s 	- %d\n", i, aux->variavel->nome, aux->variavel->escopo, aux->variavel->tipo, aux->variavel->utilizada);
+			
+				Dimensao* d;
+				for(d = aux->variavel->dimensoes ; d != NULL ; d = d->prox){
+					printf(" 		%d..%d\n", d->inicio, d->fim);
+				}
+
 			}
 		}
 	}
@@ -424,7 +557,7 @@ void imprimePilha(){
 %%
 
 /* Inicio do programa. */
-PROG: 					CABECALHO BLOCO tk_ponto 
+PROG: 					CABECALHO BLOCO {lancaErroNaoUtilizadas();} tk_ponto 
 ;
 
 CABECALHO: 				tk_program tk_identificador {pushEscopo(yytext);} tk_pontoEVirgula 
@@ -454,15 +587,15 @@ LISTA_VARIAVEIS: 		tk_identificador
 ;
 /* Vetores ou tipo */
 TIPO: 					TIPO_PADRAO 
-							{char* escopo = getEscopo(); adicionaListaTabela(yytext, escopo);}
-						| tk_array tk_abreColchete DIMENSAO_LISTA tk_fechaColchete tk_of TIPO_PADRAO 
-							{char* escopo = getEscopo(); adicionaListaTabela(yytext, escopo);}
+							{char* escopo = getEscopo(); adicionaListaTabela(yytext, escopo,NULL);}
+						| tk_array tk_abreColchete {initDimensao(); dim = 0;} DIMENSAO_LISTA tk_fechaColchete tk_of TIPO_PADRAO 
+							{char* escopo = getEscopo();adicionaListaTabela(yytext, escopo, dimensoes); ini = fim = 0;}
 ;
 
-DIMENSAO_LISTA:			DIMENSAO 	
-						| DIMENSAO_LISTA tk_virgula DIMENSAO
+DIMENSAO_LISTA:			DIMENSAO {dim++;}
+						| DIMENSAO_LISTA tk_virgula DIMENSAO {dim++;}
 ;
-DIMENSAO: 				tk_numeroInteiro tk_pontoPonto tk_numeroInteiro 
+DIMENSAO: 				tk_numeroInteiro {ini = toInt(yytext);} tk_pontoPonto tk_numeroInteiro {fim = toInt(yytext);insereDimensoes(ini,fim);}
 ;
 TIPO_PADRAO: 			tk_integer
 						| tk_char
@@ -470,7 +603,8 @@ TIPO_PADRAO: 			tk_integer
 						| tk_real
 						| tk_abreParenteses LISTA_IDS tk_fechaParenteses
 ;
-LISTA_IDS : tk_identificador | tk_identificador tk_virgula LISTA_IDS
+LISTA_IDS : 			tk_identificador 
+						| tk_identificador tk_virgula LISTA_IDS
 ;
 DECLARACAO_TYPE: 		tk_type LISTA_TYPE
 ;
@@ -502,25 +636,53 @@ LISTA_ARGUMENTOS: 		LISTA_VARIAVEIS tk_doisPontos TIPO
 
 /* Declaracao de Funcoes */
 DECLARACAO_FUNCTION: 	CABECALHO_FUNCTION 
-												{insereFuncoes(dados->nome, aridade, dados->escopo, 0); insereVariaveis(dados->nome, dados->tipo, dados->nome); aridade = 0; verificar = true; encontrouRetorno = false;} 
+												{
+													insereFuncoes(dados->nome, aridade, dados->escopo, 0); 
+													insereVariaveis(dados->nome, dados->tipo, dados->nome,NULL); 
+													aridade = 0; 
+													verificar = true; 
+													encontrouRetorno = false;
+												} 
 						BLOCO 
-												{verificar = false; lancaErroRetorno(dados->nome);} 
+												{
+													verificar = false; lancaErroRetorno(dados->nome);
+												} 
 						tk_pontoEVirgula 
-						| CABECALHO_FUNCTION 
-												{insereFuncoes(dados->nome, aridade, dados->escopo, 1); insereVariaveis(dados->nome,dados->tipo,dados->escopo); aridade = 0;} 
-						tk_forward tk_pontoEVirgula 
-												{popEscopo();}
+						| 
+						CABECALHO_FUNCTION 
+												{
+													insereFuncoes(dados->nome, aridade, dados->escopo, 1); 
+													aridade = 0;
+												} 
+						tk_forward 
+						tk_pontoEVirgula 
+												{
+													popEscopo();
+												}
 ;
 CABECALHO_FUNCTION: 	tk_function 
-												{initDados(); char* escopo = getEscopo(); strcpy(dados->escopo, escopo); aridade = 0;} 
+												{
+													initDados();
+													char* escopo = getEscopo();
+													strcpy(dados->escopo, escopo); 
+													aridade = 0;
+												} 
 						tk_identificador 
-												{strcpy(dados->nome, yytext); pushEscopo(yytext);} 
-						ARGUMENTOS tk_doisPontos TIPO_PADRAO 
-												{strcpy(dados->tipo,yytext);} tk_pontoEVirgula 
+												{
+													strcpy(dados->nome, yytext); 
+													pushEscopo(yytext);
+												} 
+						ARGUMENTOS 
+						tk_doisPontos 
+						TIPO_PADRAO 
+												{
+													strcpy(dados->tipo,yytext);
+												} 
+						tk_pontoEVirgula 
 ;
 
 /* Corpo representa tudo que pode ser incluido dentro do escopo de um begin-end */
-CORPO: 					tk_begin CORPO_LISTA tk_end {popEscopo();}
+CORPO: 					tk_begin {emCorpo = true;} CORPO_LISTA {emCorpo = false;} tk_end {popEscopo();}
 						| tk_begin tk_end {popEscopo();}
 ;
 CORPO_LISTA: 			 DECLARACAO tk_pontoEVirgula 
@@ -589,8 +751,8 @@ EXPRESSAO_LISTA : 		EXPRESSAO {qtdParametros++;}
 ;
 
 /* Continuacao das Variaveis*/
-VARIAVEL: 				 tk_identificador {verificaVariavel(id);}
-						| tk_identificador {verificaVariavel(id);} tk_abreColchete EXPRESSAO_LISTA tk_fechaColchete
+VARIAVEL: 				 tk_identificador {verificaVariavel(id);setVarUtilizada(id);}
+						| tk_identificador {verificaVariavel(id);setVarUtilizada(id); ehVetor = verificaVetor(id);} tk_abreColchete EXPRESSAO_LISTA {ehVetor = false;} tk_fechaColchete
 ;
 EXPRESSAO: 				EXPRESSAO_SIMPLES 
 						| EXPRESSAO_SIMPLES tk_igual EXPRESSAO_SIMPLES
