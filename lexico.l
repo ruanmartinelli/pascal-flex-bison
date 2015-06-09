@@ -20,6 +20,7 @@ downto								{return tk_downto ;}
 else								{return tk_else ;}
 end									{return tk_end ;}
 external							{return tk_external ;}
+false								{return tk_false;}
 file								{return tk_file ;}
 for									{return tk_for ;}
 forward								{return tk_forward ;}
@@ -54,6 +55,7 @@ string								{return tk_string ;}
 then								{return tk_then ;}
 to									{return tk_to ;}
 type								{return tk_type ;}
+true								{return tk_true;}
 unit								{return tk_unit ;}
 until								{return tk_until ;}
 uses								{return tk_uses ;}

@@ -1,60 +1,41 @@
-program TESTE;
+program global;
 
 var
-   x : integer;
-   a, b : integer;
-   vet : array[1..4] of integer;
-   mat: array[1..3,1..3] of integer;
-
-
-procedure fw(x:integer; s: integer); forward;
-
-(*
-
-Teste Comentário
-
-*)
-
+   
+	c: string;
+	a: array [1..2,1..5] of integer;
+	
+procedure fwwwww(xasd:integer; s: integer); forward;
 
 function max(num1, num2: integer): integer;
+var
+	shg : boolean;
+	
 begin
-
+	max := 5;
+	shg := false;
 end;
 
-procedure teste(x: integer; m: integer); 
-	var
-		   x : integer;
-		   a, b : integer;
-		   vet : array[1..4] of integer;
-		   mat: array[1..3,1..3] of integer;
+
+procedure teste(x: boolean; m: integer); 
 	begin
 		
 	      m := x;
-	      m := y;
-	      m := z;
 	end; 
 
-procedure fw();
+procedure fwwwww(x:integer; s: integer);
+	function peixe(agua: boolean) : integer;
+		begin
+			peixe := agua;
+		end;
 	begin
+		x := 4 + s;
 	end;
 
 begin
-	a := r;
-	a := o;
-	a := b + c + (l * f);
-	a := 1 + 4;
-
-	a := 'C';
-
-	p := max(b,c,d);
-
-	teste(p);
-
-
-	case (x) of	
-		1: x:= r+t;	
-		2: r:=t;
-	end;
+	a[1,8] := 4;
+	c := "asdasd";
+	
 	
 	
 end.

@@ -7,12 +7,12 @@ O Analisador Semântico visa verificar:
 • se as variáveis utilizadas foram declaradas; 										OK
 • se há variáveis redeclaradas;														OK - TESTAR
 • se há variáveis declaradas e não utilizadas;										OK
-• se os tipos associados às variáveis e ao valor associado são compatíveis.
 • se o número de argumentos (aridade) de uma função ou procedimento está correto. 	OK
-• se o tipo associado ao valor de retorno de uma função está correto.
 • se uma função tem retorno. 														OK
-• se os tipos associados aos argumentos de uma função ou procedimento estão corretos.
 • Se os limites dos vetores e matrizes estão corretos.				ARMAZENANDO DIMENSOES, FALTA VERIFICAR
+• se o tipo associado ao valor de retorno de uma função está correto.
+• se os tipos associados às variáveis e ao valor associado são compatíveis.
+• se os tipos associados aos argumentos de uma função ou procedimento estão corretos.
 
 */
 
@@ -48,6 +48,8 @@ bool verificar 			= false;
 bool encontrouRetorno 	= false;
 bool emCorpo 			= false;
 bool ehVetor			= false;
+char* tipoCorrente;
+char* tipoCompara;
 
 //char* idFunc;
 
@@ -225,7 +227,7 @@ void insereFuncoes(char* nome, int aridade, char* escopo, int forward){
 					&& strcmp(p->funcao->escopo, novo->funcao->escopo) == 0
 						&& p->funcao->forward == novo->funcao->forward){
 							printf("Erro semantico na linha %d. Funcao redeclarada.\n", Nlinha);
-							exit(0);
+							//exit(0);
 				}
 				anterior = p;
 				p = p->prox;
@@ -334,8 +336,41 @@ void verificaVariavel(char* nome){
 		}
 	}
 			printf("Variavel nao encontrada na linha %d \n", Nlinha);
-			exit(0);
+			//exit(0);
 }
+
+/*
+COMPARA : P
+CORRENTE: R
+*/
+void setTipo(char* nome, char t, char* valorConstante){
+	int i = 0;
+	char* escopo = getEscopo();
+	for(i = 0 ; i < 977 ; i++){
+		if(variaveis[i] != NULL){
+			Hash* aux;
+			for(aux = variaveis[i] ; aux != NULL; aux = aux->prox){
+				if(nome != NULL){
+					if(strcmp(aux->variavel->nome, nome) == 0 && strcmp(aux->variavel->escopo, escopo) == 0){
+						if(t == 'p'){
+							tipoCompara = (char*)malloc(sizeof(char)*strlen(aux->variavel->tipo));
+							strcpy(tipoCompara,aux->variavel->tipo);
+						}else{
+						if(t == 'r'){
+							tipoCorrente = (char*)malloc(sizeof(char)*strlen(aux->variavel->tipo));
+							strcpy(tipoCorrente,aux->variavel->tipo);
+						}					
+						}
+						return;
+					}
+				}
+			}
+		}
+	}
+	tipoCompara = (char*)malloc(sizeof(char)*strlen(valorConstante));
+								strcpy(tipoCompara,valorConstante);
+}
+
 
 bool verificaVetor(char* nome){
 
@@ -383,6 +418,17 @@ void lancaErroNaoUtilizadas(){
 	}
 }
 
+void verificaTipos(){
+		//printf(" 			corr [%s] =?  comp [%s]\n", tipoCorrente, tipoCompara);	
+	if(tipoCompara != NULL && tipoCorrente !=NULL){
+		if(strcmp(tipoCompara,tipoCorrente) != 0 ){
+			printf("Erro semantico na linha %d. Tipo incorreto atribuido a variavel.\n", Nlinha);
+		
+		}
+	}
+}
+
+
 void verificaFuncao(char* nome, int qtdParametros){
 	int i = 0;
 	char* escopo = getEscopo();
@@ -396,7 +442,7 @@ void verificaFuncao(char* nome, int qtdParametros){
 						&& aux->funcao->forward == 0){
 					if(aux->funcao->aridade != qtdParametros){
 						printf("Erro semantico na linha %d. Quantidade de parametros incorreta para a funcao.\n", Nlinha);
-						exit(0);
+						//exit(0);
 					}
 					return;
 				}
@@ -404,7 +450,7 @@ void verificaFuncao(char* nome, int qtdParametros){
 		}
 	}
 			printf("Funcao nao encontrada na linha %d \n", Nlinha);
-			exit(0);
+			//exit(0);
 }
 
 void verificaRetorno(char* nome, char* escopo){
@@ -416,7 +462,7 @@ void verificaRetorno(char* nome, char* escopo){
 void lancaErroRetorno(char* nome){
 	if(!encontrouRetorno){
 		printf("Funcao %s nao possui retorno.\n", nome);
-		exit(0);
+		//exit(0);
 	}
 }
 
@@ -477,6 +523,7 @@ void imprimePilha(){
 %token tk_else 
 %token tk_end 
 %token tk_external 
+%token tk_false
 %token tk_file 
 %token tk_for 
 %token tk_forward 
@@ -510,6 +557,7 @@ void imprimePilha(){
 %token tk_string
 %token tk_then
 %token tk_to
+%token tk_true
 %token tk_type
 %token tk_unit
 %token tk_until
@@ -601,6 +649,8 @@ TIPO_PADRAO: 			tk_integer
 						| tk_char
 						| tk_boolean
 						| tk_real
+						//TODO String
+						| tk_string
 						| tk_abreParenteses LISTA_IDS tk_fechaParenteses
 ;
 LISTA_IDS : 			tk_identificador 
@@ -685,8 +735,8 @@ CABECALHO_FUNCTION: 	tk_function
 CORPO: 					tk_begin {emCorpo = true;} CORPO_LISTA {emCorpo = false;} tk_end {popEscopo();}
 						| tk_begin tk_end {popEscopo();}
 ;
-CORPO_LISTA: 			 DECLARACAO tk_pontoEVirgula 
-						| DECLARACAO tk_pontoEVirgula CORPO_LISTA 
+CORPO_LISTA: 			 DECLARACAO tk_pontoEVirgula {}
+						| DECLARACAO tk_pontoEVirgula CORPO_LISTA  
 ;
 
 /* Loops, atribuicoes, chamadas de procedimento */
@@ -698,7 +748,7 @@ DECLARACAO: 			VARIAVEL_DECLARACAO
 						| CASE_DECLARACAO
 						| PROCEDURES_CHAMADA 
 ;
-VARIAVEL_DECLARACAO: 	VARIAVEL {char* escopo = getEscopo(); verificaRetorno(id,escopo);} tk_atribuicao EXPRESSAO
+VARIAVEL_DECLARACAO: 	VARIAVEL {char* escopo = getEscopo(); verificaRetorno(id,escopo);setTipo(id,'r',NULL);} tk_atribuicao EXPRESSAO {verificaTipos();}
 ;
 
 /* If */
@@ -733,11 +783,16 @@ CASE: 					LISTA_CONSTANTES tk_doisPontos DECLARACAO
 LISTA_CONSTANTES: 		CONSTANTE
 						| CONSTANTE tk_virgula LISTA_CONSTANTES
 ;
-CONSTANTE:				tk_numeroReal
-						| tk_numeroInteiro
-						| tk_caractere
+
+
+CONSTANTE:				tk_numeroReal 		{setTipo(NULL, 'p', "real");}
+						| tk_numeroInteiro 	{setTipo(NULL, 'p', "integer");}
+						| tk_caractere 		{setTipo(NULL, 'p', "char");}
+						| BOOL				{setTipo(NULL, 'p', "boolean");}
+						| tk_constString	{setTipo(NULL, 'p', "string");}
 ;
 
+BOOL: tk_true | tk_false;
 /* Chamadas de Funcao e Procedures */
 PROCEDURES_CHAMADA: 	tk_identificador {initDados(); strcpy(dados->nome,id); qtdParametros = 0;} PARAMS
 ;
@@ -745,14 +800,14 @@ FUNCAO_CHAMADA: 		tk_identificador {initDados(); strcpy(dados->nome,id);qtdParam
 
 PARAMS: tk_abreParenteses {qtdParametros = 0;} EXPRESSAO_LISTA {verificaFuncao(dados->nome,qtdParametros);} tk_fechaParenteses
 		| tk_abreParenteses {verificaFuncao(dados->nome,qtdParametros);} tk_fechaParenteses
-
+;
 EXPRESSAO_LISTA : 		EXPRESSAO {qtdParametros++;}
 						| EXPRESSAO_LISTA tk_virgula EXPRESSAO {qtdParametros++;}
 ;
 
 /* Continuacao das Variaveis*/
-VARIAVEL: 				 tk_identificador {verificaVariavel(id);setVarUtilizada(id);}
-						| tk_identificador {verificaVariavel(id);setVarUtilizada(id); ehVetor = verificaVetor(id);} tk_abreColchete EXPRESSAO_LISTA {ehVetor = false;} tk_fechaColchete
+VARIAVEL: 				 tk_identificador {verificaVariavel(id) ; setVarUtilizada(id) ; }
+						| tk_identificador {verificaVariavel(id) ; setVarUtilizada(id) ; ehVetor = verificaVetor(id) ;} tk_abreColchete EXPRESSAO_LISTA {ehVetor = false;} tk_fechaColchete
 ;
 EXPRESSAO: 				EXPRESSAO_SIMPLES 
 						| EXPRESSAO_SIMPLES tk_igual EXPRESSAO_SIMPLES
@@ -769,12 +824,12 @@ EXPRESSAO_SIMPLES: 		TERMO
 TERMO: 					FATOR
 						| TERMO MULOP FATOR
 ;
-FATOR: 					VARIAVEL 
+FATOR: 					VARIAVEL {setTipo(id, 'p',NULL);}
 						| CONSTANTE
 						| tk_abreParenteses EXPRESSAO tk_fechaParenteses 
 						| ADDOP FATOR
-						| FUNCAO_CHAMADA 
-						| tk_constString
+						//TODO FUNCAO TIPO
+						| FUNCAO_CHAMADA {   }
 ;
 MULOP:
 						tk_vezes
