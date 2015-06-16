@@ -1,21 +1,5 @@
 %{
 
-/*
-
-//TODO
-O Analisador Semântico visa verificar:
-• se as variáveis utilizadas foram declaradas; 										OK
-• se há variáveis redeclaradas;														OK - TESTAR
-• se há variáveis declaradas e não utilizadas;										OK
-• se o número de argumentos (aridade) de uma função ou procedimento está correto. 	OK
-• se uma função tem retorno. 														OK
-• Se os limites dos vetores e matrizes estão corretos.				ARMAZENANDO DIMENSOES, FALTA VERIFICAR
-• se o tipo associado ao valor de retorno de uma função está correto.
-• se os tipos associados às variáveis e ao valor associado são compatíveis.
-• se os tipos associados aos argumentos de uma função ou procedimento estão corretos.
-
-*/
-
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -50,8 +34,8 @@ bool emCorpo 			= false;
 bool ehVetor			= false;
 char* tipoCorrente;
 char* tipoCompara;
+char* escopoGlobal;
 
-//char* idFunc;
 
 struct Pilha{
 	char* nome;
@@ -74,6 +58,7 @@ struct Funcao{
 	char* 	escopo;
 	int 	aridade;
 	int		forward;
+	char*   tipo;
 };
 
 struct Variavel{
@@ -84,7 +69,6 @@ struct Variavel{
 	bool utilizada;
 	Dimensao* dimensoes;
 	int dimensao;
-	//valor
 };
 
 struct Dimensao{
@@ -110,7 +94,6 @@ void initPilha(){
 
 void initDimensao(){
 	dimensoes = NULL;
-	//dimensoes = (Dimensao*)malloc(sizeof(Dimensao));
 }
 
 void liberaDimensao(){
@@ -119,10 +102,9 @@ void liberaDimensao(){
 
 void initDados(){
 	dados 			= (Dados*)malloc(sizeof(Dados));
-	dados->nome 	= (char*)malloc(sizeof(char) *  50);
-	dados->escopo 	= (char*)malloc(sizeof(char) *  50);
-	dados->tipo 	= (char*)malloc(sizeof(char) *  50);
-	//dados->aridade  = 0;
+	dados->nome 	= (char*)malloc(sizeof(char) *  255);
+	dados->escopo 	= (char*)malloc(sizeof(char) *  255);
+	dados->tipo 	= (char*)malloc(sizeof(char) *  255);
 }
 
 void liberaDados(){
@@ -133,7 +115,7 @@ void liberaDados(){
 
 void pushEscopo(char* nome){
 	Pilha* novo = (Pilha*) malloc (sizeof(Pilha));
-	novo->nome  = (char*) malloc (sizeof(char)*50);
+	novo->nome  = (char*) malloc (sizeof(char)*255);
 	strcpy		(novo->nome,nome);
 	novo->prox  = pilha;
 	pilha 		= novo;
@@ -153,8 +135,6 @@ char* getEscopo(){
 	}
 }
 
-Variavel* getVariaveisFuncao(char* escopo){}
-
 
 int h(char* nome){
 	int i,
@@ -162,6 +142,10 @@ int h(char* nome){
 	for(i = 0; i < strlen(nome) ; i++){
 		soma = soma + nome[i];
 	}
+	if(soma > 977){
+		return soma % 9;
+	}
+	
 	return soma;
 }
 
@@ -192,25 +176,24 @@ void insereDimensoes(int ini, int fim){
 		Dimensao* novo = (Dimensao*)malloc(sizeof(Dimensao));
 		novo->inicio = ini;
 		novo->fim = fim;
-		//novo->prox = NULL;
-	//if(dimensoes != NULL){
 		novo->prox = dimensoes;
 		dimensoes = novo;
-	//}
-
 }
 
-void insereFuncoes(char* nome, int aridade, char* escopo, int forward){
+void insereFuncoes(char* nome, int aridade, char* escopo, int forward, char* tipo){
 	int tamanhoNome 		= strlen(nome);
 	int tamanhoEscopo		= strlen(escopo);
+	int tamanhoTipo			= strlen(tipo);
 	Hash* novo 				= (Hash*) 	malloc(sizeof(Hash));
 	novo->funcao 			= (Funcao*)	malloc(sizeof(Funcao));
 	novo->funcao->nome 		= (char*) 	malloc(sizeof(char)*tamanhoNome);
 	novo->funcao->escopo	= (char*) 	malloc(sizeof(char)*tamanhoEscopo);
+	novo->funcao->tipo 		= (char*) 	malloc(sizeof(char)*tamanhoTipo);
 	novo->funcao->forward	= forward;
 	novo->prox 				= NULL;
 	strcpy					(novo->funcao->nome, nome);
 	strcpy					(novo->funcao->escopo, escopo);
+	strcpy					(novo->funcao->tipo, tipo);
 	novo->funcao->aridade 	= aridade;
 
 	int indice 				= h(novo->funcao->nome);
@@ -225,9 +208,10 @@ void insereFuncoes(char* nome, int aridade, char* escopo, int forward){
 			while(p != NULL){
 				if(strcmp(p->funcao->nome, novo->funcao->nome) == 0 
 					&& strcmp(p->funcao->escopo, novo->funcao->escopo) == 0
-						&& p->funcao->forward == novo->funcao->forward){
+						&& p->funcao->forward == novo->funcao->forward 
+							&& strcmp(p->funcao->tipo, novo->funcao->tipo) == 0){
 							printf("Erro semantico na linha %d. Funcao redeclarada.\n", Nlinha);
-							//exit(0);
+							exit(0);
 				}
 				anterior = p;
 				p = p->prox;
@@ -250,7 +234,6 @@ void insereVariaveis(char* nome, char* tipo, char* escopo, Dimensao* dim){
 	novo->variavel->dimensoes = (Dimensao*)malloc(sizeof(Dimensao));
 	novo->variavel->dimensoes = dim;
 
-	//printf("Dimensao %d..%d\n",dimensao->inicio, dimensao->fim );
 	novo->prox  			= NULL;
 	strcpy					(novo->variavel->nome, nome);
 	strcpy					(novo->variavel->tipo, tipo);
@@ -286,7 +269,7 @@ void insereVariaveis(char* nome, char* tipo, char* escopo, Dimensao* dim){
 					}
 
 						printf("Erro semantico na linha %d. Variavel redeclarada.\n", Nlinha);
-						//exit(0);
+						exit(0);
 				}
 				anterior = p;
 				p = p->prox;
@@ -319,8 +302,29 @@ void adicionaListaTabela(char* tipo, char* escopo, Dimensao* dim){
 	}
 }
 
-void verificaVariavel(char* nome){
+void insereFuncoesPrimitivas(){
+	insereFuncoes("read", 1, escopoGlobal, 0, "string");
+	insereFuncoes("readln", 1, escopoGlobal, 0, "string");
+	insereFuncoes("write", 1, escopoGlobal, 0, "N/A");
+	insereFuncoes("+", 2, escopoGlobal, 0, "integer");
+	insereFuncoes("-", 2, escopoGlobal, 0, "integer");
+	insereFuncoes("*", 2, escopoGlobal, 0, "integer");
+	insereFuncoes("pow", 2, escopoGlobal, 0, "integer");
+	insereFuncoes("div", 2, escopoGlobal, 0, "integer");
+	insereFuncoes("mod", 2, escopoGlobal, 0, "integer");
+	insereFuncoes("max", 2, escopoGlobal, 0, "integer");
+	insereFuncoes("min", 2, escopoGlobal, 0, "integer");
+	insereFuncoes("+", 2, escopoGlobal, 0, "real");
+	insereFuncoes("-", 2, escopoGlobal, 0, "real");
+	insereFuncoes("*", 2, escopoGlobal, 0, "real");
+	insereFuncoes("pow", 2, escopoGlobal, 0, "real");
+	insereFuncoes("div", 2, escopoGlobal, 0, "real");
+	insereFuncoes("mod", 2, escopoGlobal, 0, "real");
+	insereFuncoes("max", 2, escopoGlobal, 0, "real");
+	insereFuncoes("min", 2, escopoGlobal, 0, "real");
+}
 
+void verificaVariavel(char* nome){
 	int i = 0;
 	char* escopo = getEscopo();
 	for(i = 0 ; i < 977 ; i++){
@@ -328,15 +332,14 @@ void verificaVariavel(char* nome){
 			Hash* aux;
 			for(aux = variaveis[i] ; aux != NULL; aux = aux->prox){
 				if(strcmp(aux->variavel->nome, nome) == 0
-					&& strcmp(aux->variavel->escopo, escopo) == 0){
+					&& (strcmp(aux->variavel->escopo, escopo) == 0 || strcmp(aux->variavel->escopo, escopoGlobal) == 0)){
 					return;
-				}else{
 				}
 			}
 		}
 	}
 			printf("Variavel nao encontrada na linha %d \n", Nlinha);
-			//exit(0);
+			exit(0);
 }
 
 /*
@@ -346,39 +349,56 @@ CORRENTE: R
 void setTipo(char* nome, char t, char* valorConstante){
 	int i = 0;
 	char* escopo = getEscopo();
-	for(i = 0 ; i < 977 ; i++){
-		if(variaveis[i] != NULL){
-			Hash* aux;
-			for(aux = variaveis[i] ; aux != NULL; aux = aux->prox){
-				if(nome != NULL){
-					if(strcmp(aux->variavel->nome, nome) == 0 && strcmp(aux->variavel->escopo, escopo) == 0){
-						if(t == 'p'){
-							tipoCompara = (char*)malloc(sizeof(char)*strlen(aux->variavel->tipo));
-							strcpy(tipoCompara,aux->variavel->tipo);
-						}else{
-						if(t == 'r'){
-							tipoCorrente = (char*)malloc(sizeof(char)*strlen(aux->variavel->tipo));
-							strcpy(tipoCorrente,aux->variavel->tipo);
-						}					
+	if(valorConstante == NULL){
+		for(i = 0 ; i < 977 ; i++){
+			if(variaveis[i] != NULL){
+				Hash* aux;
+				for(aux = variaveis[i] ; aux != NULL; aux = aux->prox){
+					if(nome != NULL){
+						if(strcmp(aux->variavel->nome, nome) == 0 && ( strcmp(aux->variavel->escopo, escopo) == 0 || strcmp(aux->variavel->escopo,escopoGlobal) == 0)){
+							if(t == 'p'){
+								tipoCompara = (char*)malloc(sizeof(char)*strlen(aux->variavel->tipo));
+								strcpy(tipoCompara,aux->variavel->tipo);
+							}else{
+								if(t == 'r'){
+									tipoCorrente = (char*)malloc(sizeof(char)*strlen(aux->variavel->tipo));
+									strcpy(tipoCorrente,aux->variavel->tipo);
+								}					
+							}
+							//return;
 						}
-						return;
 					}
 				}
 			}
 		}
+		return;
+	}if(valorConstante != NULL){
+		tipoCompara = (char*)malloc(sizeof(char)*strlen(valorConstante));
+		strcpy(tipoCompara,valorConstante);
 	}
-	tipoCompara = (char*)malloc(sizeof(char)*strlen(valorConstante));
-								strcpy(tipoCompara,valorConstante);
+}
+
+void setTipoFuncao(char* nome){
+	int i = 0;
+	char* escopo = getEscopo();
+	for(i = 0 ; i < 977 ; i++){
+		if(funcoes[i] != NULL){
+			Hash* aux;
+			for(aux = funcoes[i] ; aux != NULL; aux = aux->prox){
+				if(strcmp(aux->funcao->nome, nome) == 0
+					&& strcmp(aux->funcao->escopo, escopo) == 0
+						&& aux->funcao->forward == 0){
+					tipoCompara = (char*) malloc(sizeof(char)*255);
+					strcpy(tipoCompara,aux->funcao->tipo);
+				}
+		}
+	}
+}
 }
 
 
-bool verificaVetor(char* nome){
-
-
-}
 
 void setVarUtilizada(char* nome){
-
 	int i = 0;
 	char* escopo = getEscopo();
 	for(i = 0 ; i < 977 ; i++){
@@ -386,17 +406,13 @@ void setVarUtilizada(char* nome){
 			Hash* aux;
 			for(aux = variaveis[i] ; aux != NULL; aux = aux->prox){
 				if(strcmp(aux->variavel->nome, nome) == 0
-					&& strcmp(aux->variavel->escopo, escopo) == 0){
-
+					&& (strcmp(aux->variavel->escopo, escopo) == 0 || (strcmp(aux->variavel->escopo, escopoGlobal) == 0) )){
 						if(emCorpo){
 							aux->variavel->utilizada = true;
 						}
 						if(!emCorpo){
 							aux->variavel->utilizada =false;
 						}
-
-
-				}else{
 				}
 			}
 		}
@@ -412,6 +428,7 @@ void lancaErroNaoUtilizadas(){
 			for(aux = variaveis[i] ; aux != NULL; aux = aux->prox){
 				if(!aux->variavel->utilizada){
 					printf("Erro semantico em %s. Variavel %s nao utilizada.\n", aux->variavel->escopo, aux->variavel->nome);
+					exit(0);
 				}
 			}
 		}
@@ -419,10 +436,10 @@ void lancaErroNaoUtilizadas(){
 }
 
 void verificaTipos(){
-		//printf(" 			corr [%s] =?  comp [%s]\n", tipoCorrente, tipoCompara);	
 	if(tipoCompara != NULL && tipoCorrente !=NULL){
-		if(strcmp(tipoCompara,tipoCorrente) != 0 ){
+		if(strcmp(tipoCompara,tipoCorrente) != 0 || strcmp(tipoCompara, "N/A") == 0){
 			printf("Erro semantico na linha %d. Tipo incorreto atribuido a variavel.\n", Nlinha);
+			exit(0);
 		
 		}
 	}
@@ -432,7 +449,6 @@ void verificaTipos(){
 void verificaFuncao(char* nome, int qtdParametros){
 	int i = 0;
 	char* escopo = getEscopo();
-	//printf("PROCURANDO: %s\n", nome);
 	for(i = 0 ; i < 977 ; i++){
 		if(funcoes[i] != NULL){
 			Hash* aux;
@@ -442,7 +458,7 @@ void verificaFuncao(char* nome, int qtdParametros){
 						&& aux->funcao->forward == 0){
 					if(aux->funcao->aridade != qtdParametros){
 						printf("Erro semantico na linha %d. Quantidade de parametros incorreta para a funcao.\n", Nlinha);
-						//exit(0);
+						exit(0);
 					}
 					return;
 				}
@@ -450,7 +466,7 @@ void verificaFuncao(char* nome, int qtdParametros){
 		}
 	}
 			printf("Funcao nao encontrada na linha %d \n", Nlinha);
-			//exit(0);
+			exit(0);
 }
 
 void verificaRetorno(char* nome, char* escopo){
@@ -462,7 +478,7 @@ void verificaRetorno(char* nome, char* escopo){
 void lancaErroRetorno(char* nome){
 	if(!encontrouRetorno){
 		printf("Funcao %s nao possui retorno.\n", nome);
-		//exit(0);
+		exit(0);
 	}
 }
 
@@ -493,13 +509,18 @@ void imprimeFuncoes(){
 		if(funcoes[i] != NULL){
 			Hash* aux;
 			for(aux = funcoes[i] ; aux != NULL; aux = aux->prox){
-				printf("	[%d] : %s		- %s		-	 %d 	-	%d\n", i, aux->funcao->nome, aux->funcao->escopo, aux->funcao->aridade, aux->funcao->forward);
+				if(aux->funcao->tipo != NULL){
+					printf("	[%d] : %s	- 	%s	- %s	-	 %d -	%d\n", i, aux->funcao->nome, aux->funcao->escopo, aux->funcao->tipo ,aux->funcao->aridade, aux->funcao->forward);
+				}
+				else{
+					printf("	[%d] : %s	- 	%s	-	 %d -	%d\n", i, aux->funcao->nome, aux->funcao->escopo, aux->funcao->aridade, aux->funcao->forward);
+				}
 			}
 		}
 	}
 }
 
-void imprimePilha(){
+void imprimePilha(){ //deve sempre estar vazia pois pilha eh desempilhada
 	int 	i;
 	Pilha* 	p;
 	printf("Pilha de Escopo: \n");
@@ -608,7 +629,7 @@ void imprimePilha(){
 PROG: 					CABECALHO BLOCO {lancaErroNaoUtilizadas();} tk_ponto 
 ;
 
-CABECALHO: 				tk_program tk_identificador {pushEscopo(yytext);} tk_pontoEVirgula 
+CABECALHO: 				tk_program tk_identificador {pushEscopo(yytext); escopoGlobal = getEscopo();insereFuncoesPrimitivas();} tk_pontoEVirgula 
 ;
 
 /* Bloco agrega todos os demais componentes do programa */
@@ -649,7 +670,6 @@ TIPO_PADRAO: 			tk_integer
 						| tk_char
 						| tk_boolean
 						| tk_real
-						//TODO String
 						| tk_string
 						| tk_abreParenteses LISTA_IDS tk_fechaParenteses
 ;
@@ -665,8 +685,8 @@ DEF_TYPE: 				tk_identificador tk_igual TIPO_PADRAO tk_pontoEVirgula
 ;
 
 /* Declaracao dos Procedures */
-DECLARACAO_PROCEDURE: 	CABECALHO_PROCEDURE {insereFuncoes(dados->nome, aridade, dados->escopo, 0); aridade = 0;} BLOCO tk_pontoEVirgula 
-						| CABECALHO_PROCEDURE {insereFuncoes(dados->nome, aridade, dados->escopo, 1); aridade = 0;} tk_forward tk_pontoEVirgula {popEscopo();}
+DECLARACAO_PROCEDURE: 	CABECALHO_PROCEDURE {insereFuncoes(dados->nome, aridade, dados->escopo, 0, "N/A"); aridade = 0;} BLOCO tk_pontoEVirgula 
+						| CABECALHO_PROCEDURE {insereFuncoes(dados->nome, aridade, dados->escopo, 1, "N/A"); aridade = 0;} tk_forward tk_pontoEVirgula {popEscopo();}
 ;
 CABECALHO_PROCEDURE: 	tk_procedure 
 							{initDados(); char* escopo = getEscopo(); strcpy(dados->escopo, escopo); aridade = 0;} 
@@ -686,8 +706,8 @@ LISTA_ARGUMENTOS: 		LISTA_VARIAVEIS tk_doisPontos TIPO
 
 /* Declaracao de Funcoes */
 DECLARACAO_FUNCTION: 	CABECALHO_FUNCTION 
-												{
-													insereFuncoes(dados->nome, aridade, dados->escopo, 0); 
+												{	
+													insereFuncoes(dados->nome, aridade, dados->escopo, 0, dados->tipo); 
 													insereVariaveis(dados->nome, dados->tipo, dados->nome,NULL); 
 													aridade = 0; 
 													verificar = true; 
@@ -701,7 +721,7 @@ DECLARACAO_FUNCTION: 	CABECALHO_FUNCTION
 						| 
 						CABECALHO_FUNCTION 
 												{
-													insereFuncoes(dados->nome, aridade, dados->escopo, 1); 
+													insereFuncoes(dados->nome, aridade, dados->escopo, 1, dados->tipo); 
 													aridade = 0;
 												} 
 						tk_forward 
@@ -748,7 +768,7 @@ DECLARACAO: 			VARIAVEL_DECLARACAO
 						| CASE_DECLARACAO
 						| PROCEDURES_CHAMADA 
 ;
-VARIAVEL_DECLARACAO: 	VARIAVEL {char* escopo = getEscopo(); verificaRetorno(id,escopo);setTipo(id,'r',NULL);} tk_atribuicao EXPRESSAO {verificaTipos();}
+VARIAVEL_DECLARACAO: 	VARIAVEL {char* escopo = getEscopo(); verificaRetorno(id,escopo); setTipo(id,'r',NULL);} tk_atribuicao EXPRESSAO {verificaTipos();}
 ;
 
 /* If */
@@ -798,16 +818,17 @@ PROCEDURES_CHAMADA: 	tk_identificador {initDados(); strcpy(dados->nome,id); qtdP
 ;
 FUNCAO_CHAMADA: 		tk_identificador {initDados(); strcpy(dados->nome,id);qtdParametros = 0;} PARAMS;
 
-PARAMS: tk_abreParenteses {qtdParametros = 0;} EXPRESSAO_LISTA {verificaFuncao(dados->nome,qtdParametros);} tk_fechaParenteses
-		| tk_abreParenteses {verificaFuncao(dados->nome,qtdParametros);} tk_fechaParenteses
+PARAMS: 				tk_abreParenteses {qtdParametros = 0;} EXPRESSAO_LISTA {verificaFuncao(dados->nome,qtdParametros);} tk_fechaParenteses
+						| tk_abreParenteses {verificaFuncao(dados->nome,qtdParametros);} tk_fechaParenteses
 ;
 EXPRESSAO_LISTA : 		EXPRESSAO {qtdParametros++;}
 						| EXPRESSAO_LISTA tk_virgula EXPRESSAO {qtdParametros++;}
 ;
 
 /* Continuacao das Variaveis*/
-VARIAVEL: 				 tk_identificador {verificaVariavel(id) ; setVarUtilizada(id) ; }
-						| tk_identificador {verificaVariavel(id) ; setVarUtilizada(id) ; ehVetor = verificaVetor(id) ;} tk_abreColchete EXPRESSAO_LISTA {ehVetor = false;} tk_fechaColchete
+VARIAVEL: 				 tk_identificador {verificaVariavel(id) ; setVarUtilizada(id);}
+						| tk_identificador {verificaVariavel(id) ; setVarUtilizada(id);} tk_abreColchete EXPRESSAO_LISTA {} tk_fechaColchete
+
 ;
 EXPRESSAO: 				EXPRESSAO_SIMPLES 
 						| EXPRESSAO_SIMPLES tk_igual EXPRESSAO_SIMPLES
@@ -824,12 +845,11 @@ EXPRESSAO_SIMPLES: 		TERMO
 TERMO: 					FATOR
 						| TERMO MULOP FATOR
 ;
-FATOR: 					VARIAVEL {setTipo(id, 'p',NULL);}
+FATOR: 					VARIAVEL {setTipo(id, 'p', NULL);}
 						| CONSTANTE
 						| tk_abreParenteses EXPRESSAO tk_fechaParenteses 
 						| ADDOP FATOR
-						//TODO FUNCAO TIPO
-						| FUNCAO_CHAMADA {   }
+						| FUNCAO_CHAMADA {setTipoFuncao(id);}
 ;
 MULOP:
 						tk_vezes
@@ -847,18 +867,14 @@ ADDOP: 					tk_mais
 %%
 
 #include "lex.yy.c"
-#define HASHSIZE 97
 
 main(){
-	initLista(); /* Inicializa Lista. */
+	initLista();
 	initPilha();
-	//initDados();
 	yyparse();
-	imprimeVariaveis();
-	imprimePilha(); /* Deve sempre imprimir vazio. */
-	imprimeFuncoes();
-	/*liberaHash()
-	liberaPilha()*/
+	//imprimeVariaveis();
+	//imprimePilha(); 
+	//imprimeFuncoes();
 }
 
 yyerror (void){
