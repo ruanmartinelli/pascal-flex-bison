@@ -12,6 +12,8 @@ typedef struct Funcao Funcao;
 typedef struct Lista Lista;
 typedef struct Pilha Pilha;
 typedef struct Dados Dados;
+typedef struct Programa Programa;
+typedef struct No No;
 
 extern char* 	yytext;
 extern char*	id;
@@ -36,7 +38,35 @@ char* tipoCorrente;
 char* tipoCompara;
 char* escopoGlobal;
 
+/* Arvore de execucao */
+struct Programa{
+	struct Declaracao* dec;
+	struct Statement* stmt;
+	struct Programa* prox;
+};
 
+struct Statement{
+	struct No* lista;
+};
+
+struct Declaracao{
+	struct No* lista;
+};
+
+struct No{
+	
+	char* tipo;
+	char* valor;
+	
+	struct No* prox;	
+	
+	struct No* um;
+	struct No* dois;
+	struct No* tres;
+	struct No* quatro;
+};
+
+/* Semantico */
 struct Pilha{
 	char* nome;
 	struct Pilha* prox;
