@@ -14,6 +14,7 @@ typedef struct Pilha Pilha;
 typedef struct Dados Dados;
 typedef struct Programa Programa;
 typedef struct No No;
+typedef struct PilhaNo PilhaNo;
 
 extern char* 	yytext;
 extern char*	id;
@@ -24,6 +25,7 @@ Lista* 			lista;
 Pilha* 			pilha;
 Dados*			dados;
 Dimensao*		dimensoes;
+PilhaNo*		pilhaNo;
 
 int aridade 		= 0;
 int qtdParametros 	= 0;
@@ -37,6 +39,12 @@ bool ehVetor			= false;
 char* tipoCorrente;
 char* tipoCompara;
 char* escopoGlobal;
+
+
+struct PilhaNo{
+	struct No* no;
+	struct PilhaNo* prox;
+};
 
 /* Arvore de execucao */
 struct Programa{
@@ -118,6 +126,10 @@ void initLista(){
 	lista 	= NULL;
 }
 
+void initPilhaNo(){
+	pilhaNo 	= NULL;
+}
+
 void initPilha(){
 	pilha 	= NULL;
 }
@@ -142,6 +154,53 @@ void liberaDados(){
 	free(dados->nome);
 	free(dados);
 }
+
+No* criaNo(char* tipo, char* valor,No* um, No* dois, No* tres, No* quatro){
+	No* novo 	= (No*) malloc (sizeof(No));
+	novo->tipo 	= (char*)malloc(sizeof(char) *  255);
+	novo->valor = (char*)malloc(sizeof(char) *  255);
+	
+	strcpy(novo->tipo,tipo);
+	strcpy(novo->valor,valor);
+	
+	novo->um 		= (No*) malloc (sizeof(No));
+	novo->dois 		= (No*) malloc (sizeof(No));
+	novo->tres 		= (No*) malloc (sizeof(No));
+	novo->quatro 	= (No*) malloc (sizeof(No));
+
+	novo->um 		= um;
+	novo->dois 		= dois;
+	novo->tres 		= tres;
+	novo->quatro 	= quatro;
+	
+	return novo;
+}
+
+void pushPilhaExp(char* valor){
+	PilhaNo* novo 	= (PilhaNo*)malloc(sizeof(PilhaNo));
+	//switch/if para desempilhar caso encontre um nó + - * / etc
+	
+	
+	
+	novo->no 		= criaNo("", valor, NULL, NULL, NULL, NULL);
+	novo->prox 		= pilhaNo;
+	
+	pilhaNo 		= novo;
+}
+
+void imprimePilhaExp(){
+	PilhaNo* p = pilhaNo;
+	printf("Pilha de Nos:\n");
+	while(p!= NULL){
+	
+		printf("@ %s",p->no->valor);
+		printf("\n");
+		
+		p = p->prox;
+	}
+
+}
+
 
 void pushEscopo(char* nome){
 	Pilha* novo = (Pilha*) malloc (sizeof(Pilha));
@@ -836,7 +895,7 @@ LISTA_CONSTANTES: 		CONSTANTE
 
 
 CONSTANTE:				tk_numeroReal 		{setTipo(NULL, 'p', "real");}
-						| tk_numeroInteiro 	{setTipo(NULL, 'p', "integer");}
+						| tk_numeroInteiro 	{setTipo(NULL, 'p', "integer"); pushPilhaExp(yytext);}
 						| tk_caractere 		{setTipo(NULL, 'p', "char");}
 						| BOOL				{setTipo(NULL, 'p', "boolean");}
 						| tk_constString	{setTipo(NULL, 'p', "string");}
@@ -868,23 +927,23 @@ EXPRESSAO: 				EXPRESSAO_SIMPLES
 						| EXPRESSAO_SIMPLES tk_menorIgual EXPRESSAO_SIMPLES
 ;
 EXPRESSAO_SIMPLES: 		TERMO
-						| EXPRESSAO_SIMPLES tk_mais TERMO
-						| EXPRESSAO_SIMPLES tk_menos TERMO
-						| EXPRESSAO_SIMPLES tk_or TERMO
+						| EXPRESSAO_SIMPLES tk_mais TERMO {printf(" + \n");pushPilhaExp("+");}
+						| EXPRESSAO_SIMPLES tk_menos {} TERMO {pushPilhaExp("-");} 
+						| EXPRESSAO_SIMPLES tk_or TERMO 
 ;
-TERMO: 					FATOR
-						| TERMO MULOP FATOR
+TERMO: 					FATOR {}
+						| TERMO  MULOP  FATOR {pushPilhaExp("*");}
 ;
 FATOR: 					VARIAVEL {setTipo(id, 'p', NULL);}
-						| CONSTANTE
+						| CONSTANTE {}
 						| tk_abreParenteses EXPRESSAO tk_fechaParenteses 
 						| ADDOP FATOR
 						| FUNCAO_CHAMADA {setTipoFuncao(id);}
 ;
 MULOP:
-						tk_vezes
-						| tk_divisao
-						| tk_restoDivisaoInteira
+						tk_vezes  
+						| tk_divisao 
+						| tk_restoDivisaoInteira 
 						| tk_div
 						| tk_and
 ;
@@ -901,10 +960,12 @@ ADDOP: 					tk_mais
 main(){
 	initLista();
 	initPilha();
+	initPilhaNo();
 	yyparse();
 	//imprimeVariaveis();
 	//imprimePilha(); 
 	//imprimeFuncoes();
+	imprimePilhaExp();
 }
 
 yyerror (void){
