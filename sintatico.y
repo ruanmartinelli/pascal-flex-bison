@@ -26,6 +26,7 @@ Pilha* 			pilha;
 Dados*			dados;
 Dimensao*		dimensoes;
 PilhaNo*		pilhaNo;
+No*				arvoreExp;
 
 int aridade 		= 0;
 int qtdParametros 	= 0;
@@ -155,7 +156,35 @@ void liberaDados(){
 	free(dados);
 }
 
-No* criaNo(char* tipo, char* valor,No* um, No* dois, No* tres, No* quatro){
+int ehOperador(char* s){
+	if(strcmp(s,"+") == 0 
+		|| strcmp(s,"-") == 0
+		|| strcmp(s,"*") == 0
+		|| strcmp(s,"/") == 0){
+			return 1;
+	}
+	return 0;
+}
+void popPilhaExp();
+
+No* desempilha(/*Pilha*/){
+	if(ehOperador(pilhaNo->no->valor) == 0){
+		No* node = pilhaNo->no;
+		printf("Numero: %s\n", node->valor);
+		popPilhaExp();
+		return node;
+	}
+	else{
+			No* op = pilhaNo->no;
+			popPilhaExp();
+			printf("Operador: %s\n",op->valor);
+			op->um = desempilha();
+			op->dois = desempilha();
+			return op;
+	}
+}
+
+No* criaNo(char* tipo, char* valor, No* um, No* dois, No* tres, No* quatro){
 	No* novo 	= (No*) malloc (sizeof(No));
 	novo->tipo 	= (char*)malloc(sizeof(char) *  255);
 	novo->valor = (char*)malloc(sizeof(char) *  255);
@@ -167,6 +196,7 @@ No* criaNo(char* tipo, char* valor,No* um, No* dois, No* tres, No* quatro){
 	novo->dois 		= (No*) malloc (sizeof(No));
 	novo->tres 		= (No*) malloc (sizeof(No));
 	novo->quatro 	= (No*) malloc (sizeof(No));
+	novo->prox 		= (No*) malloc (sizeof(No));
 
 	novo->um 		= um;
 	novo->dois 		= dois;
@@ -175,17 +205,21 @@ No* criaNo(char* tipo, char* valor,No* um, No* dois, No* tres, No* quatro){
 	
 	return novo;
 }
-
+/*--- Pilha de Expressoes ----*/
 void pushPilhaExp(char* valor){
 	PilhaNo* novo 	= (PilhaNo*)malloc(sizeof(PilhaNo));
-	//switch/if para desempilhar caso encontre um nó + - * / etc
-	
-	
-	
+
 	novo->no 		= criaNo("", valor, NULL, NULL, NULL, NULL);
 	novo->prox 		= pilhaNo;
 	
 	pilhaNo 		= novo;
+}
+
+void popPilhaExp(){
+	PilhaNo* aux 	= (PilhaNo*) malloc (sizeof(PilhaNo)); 
+	aux 		= pilhaNo;
+	pilhaNo		= pilhaNo->prox;
+	free 		(aux);
 }
 
 void imprimePilhaExp(){
@@ -200,7 +234,7 @@ void imprimePilhaExp(){
 	}
 
 }
-
+/*--- Pilha de Expressoes ----*/
 
 void pushEscopo(char* nome){
 	Pilha* novo = (Pilha*) malloc (sizeof(Pilha));
@@ -223,7 +257,6 @@ char* getEscopo(){
 		return pilha->nome;
 	}
 }
-
 
 int h(char* nome){
 	int i,
@@ -927,7 +960,7 @@ EXPRESSAO: 				EXPRESSAO_SIMPLES
 						| EXPRESSAO_SIMPLES tk_menorIgual EXPRESSAO_SIMPLES
 ;
 EXPRESSAO_SIMPLES: 		TERMO
-						| EXPRESSAO_SIMPLES tk_mais TERMO {printf(" + \n");pushPilhaExp("+");}
+						| EXPRESSAO_SIMPLES tk_mais TERMO {pushPilhaExp("+");}
 						| EXPRESSAO_SIMPLES tk_menos {} TERMO {pushPilhaExp("-");} 
 						| EXPRESSAO_SIMPLES tk_or TERMO 
 ;
@@ -965,7 +998,12 @@ main(){
 	//imprimeVariaveis();
 	//imprimePilha(); 
 	//imprimeFuncoes();
-	imprimePilhaExp();
+	arvoreExp = NULL;
+	arvoreExp = desempilha();
+	//imprimePilhaExp();
+	printf("%s\n", arvoreExp->um->dois->valor);
+	
+	return 0;
 }
 
 yyerror (void){
