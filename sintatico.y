@@ -180,9 +180,13 @@ void liberaArvore(No* arv){
 
 int ehOperador(char* s){
 	if(strcmp(s,"+") == 0 
-		|| strcmp(s,"-") == 0
-		|| strcmp(s,"*") == 0
-		|| strcmp(s,"/") == 0){
+		|| strcmp(s,"-")  == 0
+		|| strcmp(s,"*")  == 0
+		|| strcmp(s,"/")  == 0 
+		|| strcmp(s,">")  == 0
+		|| strcmp(s,"=")  == 0
+		|| strcmp(s,"<>") == 0
+		|| strcmp(s,"<")  == 0){
 			return 1;
 	}
 	return 0;
@@ -235,15 +239,21 @@ Programa* initPrograma(){
 	return novo;
 };
 void imprimeArvoreDoisFilhos(No* no, int profundidade);
-void appendStmt(No* arv, Programa* prog){
-//	imprimeArvoreDoisFilhos(arv, 0);
 
+void appendStmt(No* arv, Programa* prog){
 
 	if(prog->statements == NULL){
-		printf("Entrei if\n");
 		prog->statements = arv;
 	}else{
-		printf("Entrei else\n");
+		
+		No* p;
+		for(p = prog->statements ; p->prox->prox!= NULL ; p = p->prox){
+			
+		}
+		p->prox = arv;
+		
+		
+		//prog->statements->prox = arv;
 
 		/*No* p;
 		for(p = prog->statements ; p->prox != NULL ; p = p->prox){
@@ -742,11 +752,10 @@ void imprimePilha(){ //deve sempre estar vazia pois pilha eh desempilhada
 }
 
 void imprimePrograma(Programa* prog){
-	No* p = prog->statements;
-	while(p->prox != NULL){
+	No* p;
+	for(p = prog->statements ; p->prox!= NULL ; p = p->prox){
 		printf("@ Prog:\n");
 		imprimeArvoreDoisFilhos(p,0);
-		p = p->prox;
 	}
 }
 
@@ -991,11 +1000,11 @@ DECLARACAO: 			VARIAVEL_DECLARACAO
 						| PROCEDURES_CHAMADA 
 ;
 VARIAVEL_DECLARACAO: 	VARIAVEL {char* escopo = getEscopo(); verificaRetorno(id,escopo); setTipo(id,'r',NULL);} tk_atribuicao 
-						EXPRESSAO {appendStmt(desempilha(),programa); verificaTipos();}
+						EXPRESSAO {appendStmt(criaNo("atribuicao","A",criaNo("variavel",id,NULL,NULL,NULL,NULL),desempilha(),NULL,NULL),programa); verificaTipos();}
 ;
 
 /* If */
-IF_DECLARACAO: 			tk_if EXPRESSAO tk_then CORPO 
+IF_DECLARACAO: 			tk_if EXPRESSAO tk_then CORPO {printf("%s\n",pilhaNo->no->valor);}
 						| tk_if EXPRESSAO tk_then CORPO tk_else CORPO tk_pontoEVirgula
 						| tk_if EXPRESSAO tk_then DECLARACAO 
 ;
@@ -1054,32 +1063,29 @@ VARIAVEL: 				 tk_identificador {verificaVariavel(id) ; setVarUtilizada(id);}
 
 ;
 EXPRESSAO: 				EXPRESSAO_SIMPLES 
-						| EXPRESSAO_SIMPLES tk_igual EXPRESSAO_SIMPLES
-						| EXPRESSAO_SIMPLES tk_diferenteDe EXPRESSAO_SIMPLES
-						| EXPRESSAO_SIMPLES tk_maiorQue EXPRESSAO_SIMPLES
-						| EXPRESSAO_SIMPLES tk_menorQue EXPRESSAO_SIMPLES
-						| EXPRESSAO_SIMPLES tk_menorIgual EXPRESSAO_SIMPLES
+						| EXPRESSAO_SIMPLES tk_igual EXPRESSAO_SIMPLES {pushPilhaExp("==");}
+						| EXPRESSAO_SIMPLES tk_diferenteDe EXPRESSAO_SIMPLES {pushPilhaExp("<>");}
+						| EXPRESSAO_SIMPLES tk_maiorQue  EXPRESSAO_SIMPLES {pushPilhaExp(">");}
+						| EXPRESSAO_SIMPLES tk_menorQue EXPRESSAO_SIMPLES {pushPilhaExp("<");}
+						| EXPRESSAO_SIMPLES tk_menorIgual EXPRESSAO_SIMPLES {pushPilhaExp("<=");}
 ;
-EXPRESSAO_SIMPLES: 		TERMO
+EXPRESSAO_SIMPLES: 		TERMO 
 						| EXPRESSAO_SIMPLES tk_mais TERMO {pushPilhaExp("+");}
-						| EXPRESSAO_SIMPLES tk_menos {} TERMO {pushPilhaExp("-");} 
-						| EXPRESSAO_SIMPLES tk_or TERMO 
+						| EXPRESSAO_SIMPLES tk_menos TERMO {pushPilhaExp("-");} 
+						| EXPRESSAO_SIMPLES tk_or TERMO {pushPilhaExp("or");} 
 ;
 TERMO: 					FATOR {}
-						| TERMO  MULOP  FATOR {pushPilhaExp("*");}
+						| TERMO tk_vezes FATOR {pushPilhaExp("*");}
+						| TERMO tk_divisao FATOR {pushPilhaExp("/");}
+						| TERMO tk_restoDivisaoInteira FATOR {pushPilhaExp("%");}
+						| TERMO tk_div FATOR {pushPilhaExp("div");}
+						| TERMO tk_and FATOR {pushPilhaExp("and");}
 ;
 FATOR: 					VARIAVEL {setTipo(id, 'p', NULL);}
 						| CONSTANTE {}
 						| tk_abreParenteses EXPRESSAO tk_fechaParenteses 
 						| ADDOP FATOR
 						| FUNCAO_CHAMADA {setTipoFuncao(id);}
-;
-MULOP:
-						tk_vezes  
-						| tk_divisao 
-						| tk_restoDivisaoInteira 
-						| tk_div
-						| tk_and
 ;
 ADDOP: 					tk_mais 
 						| tk_menos 
@@ -1100,14 +1106,11 @@ main(){
 	
 
 	yyparse();
-	
-
-	//arvoreExp = desempilha();
 
 	//imprimeVariaveis();
 	//imprimePilha(); 
+	//imprimePilhaExp();
 	//imprimeFuncoes();
-
 	//printf("Arvore de Expressoes\n");
 	//imprimeArvoreDoisFilhos(programa->statements,0);
 	imprimePrograma(programa);
