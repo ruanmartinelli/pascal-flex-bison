@@ -13,6 +13,8 @@ typedef struct Lista Lista;
 typedef struct Pilha Pilha;
 typedef struct Dados Dados;
 typedef struct Programa Programa;
+/*typedef struct Declaracao Declaracao;
+typedef struct Statement Statement;*/
 typedef struct No No;
 typedef struct PilhaNo PilhaNo;
 
@@ -27,6 +29,7 @@ Dados*			dados;
 Dimensao*		dimensoes;
 PilhaNo*		pilhaNo;
 No*				arvoreExp;
+Programa* 		programa;
 
 int aridade 		= 0;
 int qtdParametros 	= 0;
@@ -48,20 +51,6 @@ struct PilhaNo{
 };
 
 /* Arvore de execucao */
-struct Programa{
-	struct Declaracao* dec;
-	struct Statement* stmt;
-	struct Programa* prox;
-};
-
-struct Statement{
-	struct No* lista;
-};
-
-struct Declaracao{
-	struct No* lista;
-};
-
 struct No{
 	
 	char* tipo;
@@ -74,6 +63,25 @@ struct No{
 	struct No* tres;
 	struct No* quatro;
 };
+
+/*struct Statement{
+	struct No* lista;
+};
+
+struct Declaracao{
+	struct No* lista;
+};*/
+
+struct Programa{
+	//struct Declaracao* dec;
+	//struct Statement* stmt;
+	struct No* statements;
+	struct No* declaracoes;
+
+	struct Programa* prox;
+};
+
+
 
 /* Semantico */
 struct Pilha{
@@ -150,10 +158,24 @@ void initDados(){
 	dados->tipo 	= (char*)malloc(sizeof(char) *  255);
 }
 
+
+
+
+
 void liberaDados(){
 	free(dados->escopo);
 	free(dados->nome);
 	free(dados);
+}
+
+void liberaArvore(No* arv){
+	if(arv == NULL){
+		return;
+	}
+	liberaArvore(arv->um);
+	liberaArvore(arv->dois);
+	
+	return free(arv);
 }
 
 int ehOperador(char* s){
@@ -170,14 +192,12 @@ void popPilhaExp();
 No* desempilha(/*Pilha*/){
 	if(ehOperador(pilhaNo->no->valor) == 0){
 		No* node = pilhaNo->no;
-		printf("Numero: %s\n", node->valor);
 		popPilhaExp();
 		return node;
 	}
 	else{
 			No* op = pilhaNo->no;
 			popPilhaExp();
-			printf("Operador: %s\n",op->valor);
 			op->um = desempilha();
 			op->dois = desempilha();
 			return op;
@@ -205,6 +225,59 @@ No* criaNo(char* tipo, char* valor, No* um, No* dois, No* tres, No* quatro){
 	
 	return novo;
 }
+
+Programa* initPrograma(){
+	Programa* novo 	= (Programa*) malloc (sizeof(Programa));
+	//novo->statements= criaNo("", "",NULL, NULL,NULL,NULL);
+	novo->statements = NULL;
+	novo->declaracoes= criaNo("", "",NULL, NULL,NULL,NULL);
+	novo->prox 		= NULL;
+	return novo;
+};
+void imprimeArvoreDoisFilhos(No* no, int profundidade);
+void appendStmt(No* arv, Programa* prog){
+//	imprimeArvoreDoisFilhos(arv, 0);
+
+
+	if(prog->statements == NULL){
+		printf("Entrei if\n");
+		prog->statements = arv;
+	}else{
+		printf("Entrei else\n");
+
+		/*No* p;
+		for(p = prog->statements ; p->prox != NULL ; p = p->prox){
+
+		}
+		p->prox = arv;*/
+		//prog->statements->prox = arv;
+		/*No * p = prog->statements;
+		while(p->prox != NULL){
+			printf("Varrendo statemtens\n");
+			p = p->prox;
+		}
+		//p->prox = arv;
+		if(p->prox == NULL){
+			printf("p prox null\n");
+			p->prox = arv;
+		}*/
+
+
+		/*No* p = prog->statements;
+		No* anterior;
+		No* novo = criaNo(arv->tipo, arv->valor, arv->um, arv->dois, arv->tres, arv->quatro);
+		while(p->prox != NULL){
+			anterior = p;
+			p = p->prox;
+		}*/
+		//anterior = novo;
+		//imprimeArvoreDoisFilhos(prog->statements,0);
+		//imprimeArvoreDoisFilhos(prog->statements->prox,0);
+		//prog->statements->prox = arv;
+		//printf("OKKKKK\n");
+	}
+}
+
 /*--- Pilha de Expressoes ----*/
 void pushPilhaExp(char* valor){
 	PilhaNo* novo 	= (PilhaNo*)malloc(sizeof(PilhaNo));
@@ -222,18 +295,6 @@ void popPilhaExp(){
 	free 		(aux);
 }
 
-void imprimePilhaExp(){
-	PilhaNo* p = pilhaNo;
-	printf("Pilha de Nos:\n");
-	while(p!= NULL){
-	
-		printf("@ %s",p->no->valor);
-		printf("\n");
-		
-		p = p->prox;
-	}
-
-}
 /*--- Pilha de Expressoes ----*/
 
 void pushEscopo(char* nome){
@@ -477,7 +538,8 @@ void setTipo(char* nome, char t, char* valorConstante){
 				Hash* aux;
 				for(aux = variaveis[i] ; aux != NULL; aux = aux->prox){
 					if(nome != NULL){
-						if(strcmp(aux->variavel->nome, nome) == 0 && ( strcmp(aux->variavel->escopo, escopo) == 0 || strcmp(aux->variavel->escopo,escopoGlobal) == 0)){
+						if(strcmp(aux->variavel->nome, nome) == 0 && ( strcmp(aux->variavel->escopo, escopo) == 0 
+							|| strcmp(aux->variavel->escopo,escopoGlobal) == 0)){
 							if(t == 'p'){
 								tipoCompara = (char*)malloc(sizeof(char)*strlen(aux->variavel->tipo));
 								strcpy(tipoCompara,aux->variavel->tipo);
@@ -605,6 +667,32 @@ void lancaErroRetorno(char* nome){
 }
 
 /*Funcoes de imprimir*/
+void imprimePilhaExp(){
+	PilhaNo* p = pilhaNo;
+	printf("Pilha de Nos:\n");
+	while(p!= NULL){
+	
+//		printf("@ %s",p->no->valor);
+//		printf("\n");
+		
+		p = p->prox;
+	}
+
+}
+
+void imprimeArvoreDoisFilhos(No* arv, int profundidade){
+	if(arv != NULL){
+		imprimeArvoreDoisFilhos(arv->um,profundidade+2);
+		int i;
+		for(i = 0 ; i < profundidade ; i++){
+			printf("  ");
+		}
+		printf("%s\n", arv->valor);
+		imprimeArvoreDoisFilhos(arv->dois,profundidade+2);
+	}
+}
+
+
 void imprimeVariaveis(){
 	int i;
 	printf("Tabela de Variaveis:\n");
@@ -612,7 +700,8 @@ void imprimeVariaveis(){
 		if(variaveis[i] != NULL){
 			Hash* aux;
 			for(aux = variaveis[i] ; aux != NULL; aux = aux->prox){
-				printf("	[%d] : %s		- %s		- %s 	- %d\n", i, aux->variavel->nome, aux->variavel->escopo, aux->variavel->tipo, aux->variavel->utilizada);
+				printf("	[%d] : %s		- %s		- %s 	- %d\n",
+				 i, aux->variavel->nome, aux->variavel->escopo, aux->variavel->tipo, aux->variavel->utilizada);
 			
 				Dimensao* d;
 				for(d = aux->variavel->dimensoes ; d != NULL ; d = d->prox){
@@ -632,7 +721,8 @@ void imprimeFuncoes(){
 			Hash* aux;
 			for(aux = funcoes[i] ; aux != NULL; aux = aux->prox){
 				if(aux->funcao->tipo != NULL){
-					printf("	[%d] : %s	- 	%s	- %s	-	 %d -	%d\n", i, aux->funcao->nome, aux->funcao->escopo, aux->funcao->tipo ,aux->funcao->aridade, aux->funcao->forward);
+					printf("	[%d] : %s	- 	%s	- %s	-	 %d -	%d\n",
+					 i, aux->funcao->nome, aux->funcao->escopo, aux->funcao->tipo ,aux->funcao->aridade, aux->funcao->forward);
 				}
 				else{
 					printf("	[%d] : %s	- 	%s	-	 %d -	%d\n", i, aux->funcao->nome, aux->funcao->escopo, aux->funcao->aridade, aux->funcao->forward);
@@ -648,6 +738,15 @@ void imprimePilha(){ //deve sempre estar vazia pois pilha eh desempilhada
 	printf("Pilha de Escopo: \n");
 	for(p = pilha ; p!= NULL ; p = p->prox){
 		printf("	%s\n", p->nome);
+	}
+}
+
+void imprimePrograma(Programa* prog){
+	No* p = prog->statements;
+	while(p->prox != NULL){
+		printf("@ Prog:\n");
+		imprimeArvoreDoisFilhos(p,0);
+		p = p->prox;
 	}
 }
 
@@ -808,7 +907,8 @@ DEF_TYPE: 				tk_identificador tk_igual TIPO_PADRAO tk_pontoEVirgula
 
 /* Declaracao dos Procedures */
 DECLARACAO_PROCEDURE: 	CABECALHO_PROCEDURE {insereFuncoes(dados->nome, aridade, dados->escopo, 0, "N/A"); aridade = 0;} BLOCO tk_pontoEVirgula 
-						| CABECALHO_PROCEDURE {insereFuncoes(dados->nome, aridade, dados->escopo, 1, "N/A"); aridade = 0;} tk_forward tk_pontoEVirgula {popEscopo();}
+						| CABECALHO_PROCEDURE {insereFuncoes(dados->nome, aridade, dados->escopo, 1, "N/A"); aridade = 0;} 
+						tk_forward tk_pontoEVirgula {popEscopo();}
 ;
 CABECALHO_PROCEDURE: 	tk_procedure 
 							{initDados(); char* escopo = getEscopo(); strcpy(dados->escopo, escopo); aridade = 0;} 
@@ -890,7 +990,8 @@ DECLARACAO: 			VARIAVEL_DECLARACAO
 						| CASE_DECLARACAO
 						| PROCEDURES_CHAMADA 
 ;
-VARIAVEL_DECLARACAO: 	VARIAVEL {char* escopo = getEscopo(); verificaRetorno(id,escopo); setTipo(id,'r',NULL);} tk_atribuicao EXPRESSAO {verificaTipos();}
+VARIAVEL_DECLARACAO: 	VARIAVEL {char* escopo = getEscopo(); verificaRetorno(id,escopo); setTipo(id,'r',NULL);} tk_atribuicao 
+						EXPRESSAO {appendStmt(desempilha(),programa); verificaTipos();}
 ;
 
 /* If */
@@ -994,14 +1095,22 @@ main(){
 	initLista();
 	initPilha();
 	initPilhaNo();
+	programa = initPrograma();
+	arvoreExp = NULL;
+	
+
 	yyparse();
+	
+
+	//arvoreExp = desempilha();
+
 	//imprimeVariaveis();
 	//imprimePilha(); 
 	//imprimeFuncoes();
-	arvoreExp = NULL;
-	arvoreExp = desempilha();
-	//imprimePilhaExp();
-	printf("%s\n", arvoreExp->um->dois->valor);
+
+	//printf("Arvore de Expressoes\n");
+	//imprimeArvoreDoisFilhos(programa->statements,0);
+	imprimePrograma(programa);
 	
 	return 0;
 }
