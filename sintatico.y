@@ -30,6 +30,7 @@ Dimensao*		dimensoes;
 PilhaNo*		pilhaNo;
 No*				arvoreExp;
 Programa* 		programa;
+No*				currentStatement;
 
 int aridade 		= 0;
 int qtdParametros 	= 0;
@@ -137,6 +138,7 @@ void initLista(){
 
 void initPilhaNo(){
 	pilhaNo 	= NULL;
+	currentStatement = NULL;
 }
 
 void initPilha(){
@@ -158,7 +160,7 @@ void initDados(){
 	dados->tipo 	= (char*)malloc(sizeof(char) *  255);
 }
 
-
+void imprimePilha();
 
 
 
@@ -290,12 +292,15 @@ void appendStmt(No* arv, Programa* prog){
 
 /*--- Pilha de Expressoes ----*/
 void pushPilhaExp(char* valor){
+	//printf("Pushando Pilha: %s\n", valor);
 	PilhaNo* novo 	= (PilhaNo*)malloc(sizeof(PilhaNo));
 
 	novo->no 		= criaNo("", valor, NULL, NULL, NULL, NULL);
 	novo->prox 		= pilhaNo;
 	
 	pilhaNo 		= novo;
+
+	//printf("Pushado Ok\n");
 }
 
 void popPilhaExp(){
@@ -317,10 +322,17 @@ void pushEscopo(char* nome){
 }
 
 void popEscopo(){
+		
+	if(pilha->prox != NULL){
+	printf("Popando Escopo\n");
+
 	Pilha* aux 	= (Pilha*) malloc (sizeof(Pilha)); 
 	aux 		= pilha;
 	pilha 		= pilha->prox;
-	free 		(aux);
+	imprimePilha();
+	printf("Popando FIM\n");
+	}
+	//free 		(aux);
 }
 
 char* getEscopo(){
@@ -735,7 +747,8 @@ void imprimeFuncoes(){
 					 i, aux->funcao->nome, aux->funcao->escopo, aux->funcao->tipo ,aux->funcao->aridade, aux->funcao->forward);
 				}
 				else{
-					printf("	[%d] : %s	- 	%s	-	 %d -	%d\n", i, aux->funcao->nome, aux->funcao->escopo, aux->funcao->aridade, aux->funcao->forward);
+					printf("	[%d] : %s	- 	%s	-	 %d -	%d\n", i, 
+						aux->funcao->nome, aux->funcao->escopo, aux->funcao->aridade, aux->funcao->forward);
 				}
 			}
 		}
@@ -751,11 +764,17 @@ void imprimePilha(){ //deve sempre estar vazia pois pilha eh desempilhada
 	}
 }
 
+
 void imprimePrograma(Programa* prog){
-	No* p;
-	for(p = prog->statements ; p->prox!= NULL ; p = p->prox){
-		printf("@ Prog:\n");
-		imprimeArvoreDoisFilhos(p,0);
+	if(prog->statements != NULL){
+		No* p;
+		for(p = prog->statements ; p->prox!= NULL ; p = p->prox){
+			printf("@ %s\n", p->tipo);
+			imprimeArvoreDoisFilhos(p,0);
+		}
+	}
+	else{
+		printf("@ Programa NULL\n");
 	}
 }
 
@@ -856,10 +875,11 @@ void imprimePrograma(Programa* prog){
 %%
 
 /* Inicio do programa. */
-PROG: 					CABECALHO BLOCO {lancaErroNaoUtilizadas();} tk_ponto 
+PROG: 					CABECALHO {} BLOCO {lancaErroNaoUtilizadas();} tk_ponto 
 ;
 
-CABECALHO: 				tk_program tk_identificador {pushEscopo(yytext); escopoGlobal = getEscopo();insereFuncoesPrimitivas();} tk_pontoEVirgula 
+CABECALHO: 				tk_program tk_identificador 
+{pushEscopo(yytext); escopoGlobal = getEscopo();insereFuncoesPrimitivas();} tk_pontoEVirgula 
 ;
 
 /* Bloco agrega todos os demais componentes do programa */
@@ -867,7 +887,7 @@ BLOCO: 					VARIAVEIS BLOCO
 						| DECLARACAO_PROCEDURE BLOCO 
 						| DECLARACAO_PROCEDURE 
 						| VARIAVEIS 	
-						| CORPO 
+						| {} CORPO {}
 						| DECLARACAO_FUNCTION 
 						| DECLARACAO_FUNCTION BLOCO 
 						| DECLARACAO_TYPE
@@ -894,7 +914,8 @@ TIPO: 					TIPO_PADRAO
 DIMENSAO_LISTA:			DIMENSAO {dim++;}
 						| DIMENSAO_LISTA tk_virgula DIMENSAO {dim++;}
 ;
-DIMENSAO: 				tk_numeroInteiro {ini = toInt(yytext);} tk_pontoPonto tk_numeroInteiro {fim = toInt(yytext);insereDimensoes(ini,fim);}
+DIMENSAO: 				tk_numeroInteiro {ini = toInt(yytext);} tk_pontoPonto tk_numeroInteiro 
+						{fim = toInt(yytext);insereDimensoes(ini,fim);}
 ;
 TIPO_PADRAO: 			tk_integer
 						| tk_char
@@ -915,7 +936,8 @@ DEF_TYPE: 				tk_identificador tk_igual TIPO_PADRAO tk_pontoEVirgula
 ;
 
 /* Declaracao dos Procedures */
-DECLARACAO_PROCEDURE: 	CABECALHO_PROCEDURE {insereFuncoes(dados->nome, aridade, dados->escopo, 0, "N/A"); aridade = 0;} BLOCO tk_pontoEVirgula 
+DECLARACAO_PROCEDURE: 	CABECALHO_PROCEDURE {insereFuncoes(dados->nome, aridade, dados->escopo, 0, "N/A"); aridade = 0;} 
+						BLOCO tk_pontoEVirgula 
 						| CABECALHO_PROCEDURE {insereFuncoes(dados->nome, aridade, dados->escopo, 1, "N/A"); aridade = 0;} 
 						tk_forward tk_pontoEVirgula {popEscopo();}
 ;
@@ -984,7 +1006,7 @@ CABECALHO_FUNCTION: 	tk_function
 
 /* Corpo representa tudo que pode ser incluido dentro do escopo de um begin-end */
 CORPO: 					tk_begin {emCorpo = true;} CORPO_LISTA {emCorpo = false;} tk_end {popEscopo();}
-						| tk_begin tk_end {popEscopo();}
+						| tk_begin {} tk_end {popEscopo();}
 ;
 CORPO_LISTA: 			 DECLARACAO tk_pontoEVirgula {}
 						| DECLARACAO tk_pontoEVirgula CORPO_LISTA  
@@ -1000,18 +1022,24 @@ DECLARACAO: 			VARIAVEL_DECLARACAO
 						| PROCEDURES_CHAMADA 
 ;
 VARIAVEL_DECLARACAO: 	VARIAVEL {char* escopo = getEscopo(); verificaRetorno(id,escopo); setTipo(id,'r',NULL);} tk_atribuicao 
-						EXPRESSAO {appendStmt(criaNo("atribuicao","A",criaNo("variavel",id,NULL,NULL,NULL,NULL),desempilha(),NULL,NULL),programa); verificaTipos();}
+						EXPRESSAO {appendStmt(
+							criaNo("atribuicao","A",
+								criaNo("variavel",id,NULL,NULL,NULL,NULL),
+								desempilha(),
+								NULL,
+								NULL),
+							programa); verificaTipos(); }
 ;
 
 /* If */
-IF_DECLARACAO: 			tk_if EXPRESSAO tk_then CORPO {printf("%s\n",pilhaNo->no->valor);}
+IF_DECLARACAO: 			tk_if EXPRESSAO tk_then CORPO 
 						| tk_if EXPRESSAO tk_then CORPO tk_else CORPO tk_pontoEVirgula
-						| tk_if EXPRESSAO tk_then DECLARACAO 
+						| tk_if EXPRESSAO tk_then DECLARACAO {printf("IF OK\n");printf("@@ @@ @@ @@ %s\n", pilhaNo->no->valor);}
 ;
 
 /* While */
-WHILE_DECLARACAO: 		tk_while EXPRESSAO tk_do DECLARACAO
-						| tk_while EXPRESSAO tk_do CORPO
+WHILE_DECLARACAO: 		tk_while EXPRESSAO tk_do DECLARACAO {appendStmt(criaNo("while","W",desempilha(),NULL,NULL,NULL),programa);}
+						| tk_while EXPRESSAO tk_do CORPO {appendStmt(criaNo("while","W",desempilha(),NULL,NULL,NULL),programa);}
 ;
 
 /* Repeat-until */
@@ -1038,9 +1066,10 @@ LISTA_CONSTANTES: 		CONSTANTE
 
 
 CONSTANTE:				tk_numeroReal 		{setTipo(NULL, 'p', "real");}
-						| tk_numeroInteiro 	{setTipo(NULL, 'p', "integer"); pushPilhaExp(yytext);}
+						| tk_numeroInteiro 	{setTipo(NULL, 'p', "integer"); 
+						pushPilhaExp(yytext); }
 						| tk_caractere 		{setTipo(NULL, 'p', "char");}
-						| BOOL				{setTipo(NULL, 'p', "boolean");}
+						| BOOL				{ setTipo(NULL, 'p', "boolean");}
 						| tk_constString	{setTipo(NULL, 'p', "string");}
 ;
 
@@ -1050,7 +1079,8 @@ PROCEDURES_CHAMADA: 	tk_identificador {initDados(); strcpy(dados->nome,id); qtdP
 ;
 FUNCAO_CHAMADA: 		tk_identificador {initDados(); strcpy(dados->nome,id);qtdParametros = 0;} PARAMS;
 
-PARAMS: 				tk_abreParenteses {qtdParametros = 0;} EXPRESSAO_LISTA {verificaFuncao(dados->nome,qtdParametros);} tk_fechaParenteses
+PARAMS: 				tk_abreParenteses {qtdParametros = 0;} EXPRESSAO_LISTA 
+{verificaFuncao(dados->nome,qtdParametros);} tk_fechaParenteses
 						| tk_abreParenteses {verificaFuncao(dados->nome,qtdParametros);} tk_fechaParenteses
 ;
 EXPRESSAO_LISTA : 		EXPRESSAO {qtdParametros++;}
@@ -1065,7 +1095,7 @@ VARIAVEL: 				 tk_identificador {verificaVariavel(id) ; setVarUtilizada(id);}
 EXPRESSAO: 				EXPRESSAO_SIMPLES 
 						| EXPRESSAO_SIMPLES tk_igual EXPRESSAO_SIMPLES {pushPilhaExp("==");}
 						| EXPRESSAO_SIMPLES tk_diferenteDe EXPRESSAO_SIMPLES {pushPilhaExp("<>");}
-						| EXPRESSAO_SIMPLES tk_maiorQue  EXPRESSAO_SIMPLES {pushPilhaExp(">");}
+						| EXPRESSAO_SIMPLES tk_maiorQue EXPRESSAO_SIMPLES {pushPilhaExp(">");}
 						| EXPRESSAO_SIMPLES tk_menorQue EXPRESSAO_SIMPLES {pushPilhaExp("<");}
 						| EXPRESSAO_SIMPLES tk_menorIgual EXPRESSAO_SIMPLES {pushPilhaExp("<=");}
 ;
@@ -1074,14 +1104,14 @@ EXPRESSAO_SIMPLES: 		TERMO
 						| EXPRESSAO_SIMPLES tk_menos TERMO {pushPilhaExp("-");} 
 						| EXPRESSAO_SIMPLES tk_or TERMO {pushPilhaExp("or");} 
 ;
-TERMO: 					FATOR {}
+TERMO: 					FATOR 
 						| TERMO tk_vezes FATOR {pushPilhaExp("*");}
 						| TERMO tk_divisao FATOR {pushPilhaExp("/");}
 						| TERMO tk_restoDivisaoInteira FATOR {pushPilhaExp("%");}
 						| TERMO tk_div FATOR {pushPilhaExp("div");}
 						| TERMO tk_and FATOR {pushPilhaExp("and");}
 ;
-FATOR: 					VARIAVEL {setTipo(id, 'p', NULL);}
+FATOR: 					VARIAVEL {setTipo(id, 'p', NULL); pushPilhaExp(id);}
 						| CONSTANTE {}
 						| tk_abreParenteses EXPRESSAO tk_fechaParenteses 
 						| ADDOP FATOR
@@ -1104,7 +1134,7 @@ main(){
 	programa = initPrograma();
 	arvoreExp = NULL;
 	
-
+	printf("Main Begin\n");
 	yyparse();
 
 	//imprimeVariaveis();
@@ -1113,8 +1143,8 @@ main(){
 	//imprimeFuncoes();
 	//printf("Arvore de Expressoes\n");
 	//imprimeArvoreDoisFilhos(programa->statements,0);
+	printf("Main OVER\n");
 	imprimePrograma(programa);
-	
 	return 0;
 }
 
