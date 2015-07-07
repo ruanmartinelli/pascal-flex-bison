@@ -13,8 +13,6 @@ typedef struct Lista Lista;
 typedef struct Pilha Pilha;
 typedef struct Dados Dados;
 typedef struct Programa Programa;
-/*typedef struct Declaracao Declaracao;
-typedef struct Statement Statement;*/
 typedef struct No No;
 typedef struct PilhaNo PilhaNo;
 
@@ -31,6 +29,9 @@ PilhaNo*		pilhaNo;
 No*				arvoreExp;
 Programa* 		programa;
 No*				currentStatement;
+No* 			prog;
+No* 			listaProg;
+char* 			nomeVar;
 
 int aridade 		= 0;
 int qtdParametros 	= 0;
@@ -44,7 +45,7 @@ bool ehVetor			= false;
 char* tipoCorrente;
 char* tipoCompara;
 char* escopoGlobal;
-
+bool onMainCorpo = false;
 
 struct PilhaNo{
 	struct No* no;
@@ -81,8 +82,6 @@ struct Programa{
 
 	struct Programa* prox;
 };
-
-
 
 /* Semantico */
 struct Pilha{
@@ -193,6 +192,7 @@ int ehOperador(char* s){
 	}
 	return 0;
 }
+
 void popPilhaExp();
 
 No* desempilha(/*Pilha*/){
@@ -218,11 +218,11 @@ No* criaNo(char* tipo, char* valor, No* um, No* dois, No* tres, No* quatro){
 	strcpy(novo->tipo,tipo);
 	strcpy(novo->valor,valor);
 	
-	novo->um 		= (No*) malloc (sizeof(No));
+	/*novo->um 		= (No*) malloc (sizeof(No));
 	novo->dois 		= (No*) malloc (sizeof(No));
 	novo->tres 		= (No*) malloc (sizeof(No));
-	novo->quatro 	= (No*) malloc (sizeof(No));
-	novo->prox 		= (No*) malloc (sizeof(No));
+	novo->quatro 	= (No*) malloc (sizeof(No));*/
+	novo->prox 		= NULL;
 
 	novo->um 		= um;
 	novo->dois 		= dois;
@@ -234,73 +234,28 @@ No* criaNo(char* tipo, char* valor, No* um, No* dois, No* tres, No* quatro){
 
 Programa* initPrograma(){
 	Programa* novo 	= (Programa*) malloc (sizeof(Programa));
-	//novo->statements= criaNo("", "",NULL, NULL,NULL,NULL);
 	novo->statements = NULL;
-	novo->declaracoes= criaNo("", "",NULL, NULL,NULL,NULL);
 	novo->prox 		= NULL;
 	return novo;
 };
 void imprimeArvoreDoisFilhos(No* no, int profundidade);
 
-void appendStmt(No* arv, Programa* prog){
-
-	if(prog->statements == NULL){
-		prog->statements = arv;
+void appendStmt(No* arv, No* lista){
+	if(listaProg == NULL){
+		listaProg = arv;
 	}else{
-		
-		No* p;
-		for(p = prog->statements ; p->prox->prox!= NULL ; p = p->prox){
-			
-		}
+		No* p = listaProg;
+		while(p->prox != NULL) p = p->prox;
 		p->prox = arv;
-		
-		
-		//prog->statements->prox = arv;
-
-		/*No* p;
-		for(p = prog->statements ; p->prox != NULL ; p = p->prox){
-
-		}
-		p->prox = arv;*/
-		//prog->statements->prox = arv;
-		/*No * p = prog->statements;
-		while(p->prox != NULL){
-			printf("Varrendo statemtens\n");
-			p = p->prox;
-		}
-		//p->prox = arv;
-		if(p->prox == NULL){
-			printf("p prox null\n");
-			p->prox = arv;
-		}*/
-
-
-		/*No* p = prog->statements;
-		No* anterior;
-		No* novo = criaNo(arv->tipo, arv->valor, arv->um, arv->dois, arv->tres, arv->quatro);
-		while(p->prox != NULL){
-			anterior = p;
-			p = p->prox;
-		}*/
-		//anterior = novo;
-		//imprimeArvoreDoisFilhos(prog->statements,0);
-		//imprimeArvoreDoisFilhos(prog->statements->prox,0);
-		//prog->statements->prox = arv;
-		//printf("OKKKKK\n");
 	}
 }
 
 /*--- Pilha de Expressoes ----*/
 void pushPilhaExp(char* valor){
-	//printf("Pushando Pilha: %s\n", valor);
 	PilhaNo* novo 	= (PilhaNo*)malloc(sizeof(PilhaNo));
-
 	novo->no 		= criaNo("", valor, NULL, NULL, NULL, NULL);
 	novo->prox 		= pilhaNo;
-	
 	pilhaNo 		= novo;
-
-	//printf("Pushado Ok\n");
 }
 
 void popPilhaExp(){
@@ -309,7 +264,6 @@ void popPilhaExp(){
 	pilhaNo		= pilhaNo->prox;
 	free 		(aux);
 }
-
 /*--- Pilha de Expressoes ----*/
 
 void pushEscopo(char* nome){
@@ -425,7 +379,6 @@ void insereFuncoes(char* nome, int aridade, char* escopo, int forward, char* tip
 		}
 	}
 }
-
 
 void insereVariaveis(char* nome, char* tipo, char* escopo, Dimensao* dim){
 	int tamanhoNome 		= 				strlen(nome);
@@ -597,12 +550,10 @@ void setTipoFuncao(char* nome){
 					tipoCompara = (char*) malloc(sizeof(char)*255);
 					strcpy(tipoCompara,aux->funcao->tipo);
 				}
+			}
 		}
 	}
 }
-}
-
-
 
 void setVarUtilizada(char* nome){
 	int i = 0;
@@ -613,12 +564,12 @@ void setVarUtilizada(char* nome){
 			for(aux = variaveis[i] ; aux != NULL; aux = aux->prox){
 				if(strcmp(aux->variavel->nome, nome) == 0
 					&& (strcmp(aux->variavel->escopo, escopo) == 0 || (strcmp(aux->variavel->escopo, escopoGlobal) == 0) )){
-						if(emCorpo){
+						//if(emCorpo){
 							aux->variavel->utilizada = true;
-						}
-						if(!emCorpo){
-							aux->variavel->utilizada =false;
-						}
+						//}
+						//if(!emCorpo){
+						//	aux->variavel->utilizada =false;
+						//}
 				}
 			}
 		}
@@ -650,7 +601,6 @@ void verificaTipos(){
 		}
 	}
 }
-
 
 void verificaFuncao(char* nome, int qtdParametros){
 	int i = 0;
@@ -693,10 +643,8 @@ void imprimePilhaExp(){
 	PilhaNo* p = pilhaNo;
 	printf("Pilha de Nos:\n");
 	while(p!= NULL){
-	
-//		printf("@ %s",p->no->valor);
-//		printf("\n");
-		
+		printf("@ %s",p->no->valor);
+		printf("\n");
 		p = p->prox;
 	}
 
@@ -713,7 +661,6 @@ void imprimeArvoreDoisFilhos(No* arv, int profundidade){
 		imprimeArvoreDoisFilhos(arv->dois,profundidade+2);
 	}
 }
-
 
 void imprimeVariaveis(){
 	int i;
@@ -764,8 +711,7 @@ void imprimePilha(){ //deve sempre estar vazia pois pilha eh desempilhada
 	}
 }
 
-
-void imprimePrograma(Programa* prog){
+/*void imprimePrograma(Programa* prog){
 	if(prog->statements != NULL){
 		No* p;
 		for(p = prog->statements ; p->prox!= NULL ; p = p->prox){
@@ -776,7 +722,21 @@ void imprimePrograma(Programa* prog){
 	else{
 		printf("@ Programa NULL\n");
 	}
+}*/
+
+void imprimeProgramaNo(No* prg){
+	if(prg != NULL){
+		No* p;
+		for(p = prg; p!= NULL ; p = p->prox){
+			printf("@ %s\n", p->tipo);
+			imprimeArvoreDoisFilhos(p,0);
+		}
+	}
+	else{
+		printf("@ Programa Null\n");
+	}
 }
+
 
 %}
 
@@ -879,7 +839,8 @@ PROG: 					CABECALHO {} BLOCO {lancaErroNaoUtilizadas();} tk_ponto
 ;
 
 CABECALHO: 				tk_program tk_identificador 
-{pushEscopo(yytext); escopoGlobal = getEscopo();insereFuncoesPrimitivas();} tk_pontoEVirgula 
+						{pushEscopo(yytext); escopoGlobal = getEscopo();insereFuncoesPrimitivas();} 
+						tk_pontoEVirgula 
 ;
 
 /* Bloco agrega todos os demais componentes do programa */
@@ -887,7 +848,7 @@ BLOCO: 					VARIAVEIS BLOCO
 						| DECLARACAO_PROCEDURE BLOCO 
 						| DECLARACAO_PROCEDURE 
 						| VARIAVEIS 	
-						| {} CORPO {}
+						| CORPO 
 						| DECLARACAO_FUNCTION 
 						| DECLARACAO_FUNCTION BLOCO 
 						| DECLARACAO_TYPE
@@ -904,6 +865,7 @@ LISTA_VARIAVEIS: 		tk_identificador
 						| LISTA_VARIAVEIS tk_virgula tk_identificador 
 							{insereIdentificadores(yytext);aridade++;}
 ;
+
 /* Vetores ou tipo */
 TIPO: 					TIPO_PADRAO 
 							{char* escopo = getEscopo(); adicionaListaTabela(yytext, escopo,NULL);}
@@ -1021,25 +983,24 @@ DECLARACAO: 			VARIAVEL_DECLARACAO
 						| CASE_DECLARACAO
 						| PROCEDURES_CHAMADA 
 ;
-VARIAVEL_DECLARACAO: 	VARIAVEL {char* escopo = getEscopo(); verificaRetorno(id,escopo); setTipo(id,'r',NULL);} tk_atribuicao 
-						EXPRESSAO {appendStmt(
-							criaNo("atribuicao","A",
-								criaNo("variavel",id,NULL,NULL,NULL,NULL),
-								desempilha(),
-								NULL,
-								NULL),
-							programa); verificaTipos(); }
+VARIAVEL_DECLARACAO: 	VARIAVEL {char* escopo = getEscopo(); verificaRetorno(id,escopo); setTipo(id,'r',NULL); nomeVar = id;} 
+						tk_atribuicao 
+						EXPRESSAO 
+						{
+							appendStmt(criaNo("atribuicao","A",criaNo("variavel",nomeVar,NULL,NULL,NULL,NULL), desempilha(), NULL,NULL), listaProg); 
+							verificaTipos();
+						}
 ;
 
 /* If */
 IF_DECLARACAO: 			tk_if EXPRESSAO tk_then CORPO 
 						| tk_if EXPRESSAO tk_then CORPO tk_else CORPO tk_pontoEVirgula
-						| tk_if EXPRESSAO tk_then DECLARACAO {printf("IF OK\n");printf("@@ @@ @@ @@ %s\n", pilhaNo->no->valor);}
+						| tk_if EXPRESSAO tk_then DECLARACAO
 ;
 
 /* While */
-WHILE_DECLARACAO: 		tk_while EXPRESSAO tk_do DECLARACAO {appendStmt(criaNo("while","W",desempilha(),NULL,NULL,NULL),programa);}
-						| tk_while EXPRESSAO tk_do CORPO {appendStmt(criaNo("while","W",desempilha(),NULL,NULL,NULL),programa);}
+WHILE_DECLARACAO: 		tk_while EXPRESSAO tk_do DECLARACAO {}
+						| tk_while EXPRESSAO tk_do {} CORPO {}
 ;
 
 /* Repeat-until */
@@ -1065,12 +1026,11 @@ LISTA_CONSTANTES: 		CONSTANTE
 ;
 
 
-CONSTANTE:				tk_numeroReal 		{setTipo(NULL, 'p', "real");}
-						| tk_numeroInteiro 	{setTipo(NULL, 'p', "integer"); 
-						pushPilhaExp(yytext); }
-						| tk_caractere 		{setTipo(NULL, 'p', "char");}
-						| BOOL				{ setTipo(NULL, 'p', "boolean");}
-						| tk_constString	{setTipo(NULL, 'p', "string");}
+CONSTANTE:				tk_numeroReal 		{setTipo(NULL, 'p', "real"); 	pushPilhaExp(yytext);}
+						| tk_numeroInteiro 	{setTipo(NULL, 'p', "integer"); pushPilhaExp(yytext);}
+						| tk_caractere 		{setTipo(NULL, 'p', "char"); 	pushPilhaExp(yytext);}
+						| BOOL				{ setTipo(NULL, 'p', "boolean");pushPilhaExp(yytext);}
+						| tk_constString	{setTipo(NULL, 'p', "string"); 	pushPilhaExp(yytext);}
 ;
 
 BOOL: tk_true | tk_false;
@@ -1131,20 +1091,17 @@ main(){
 	initLista();
 	initPilha();
 	initPilhaNo();
-	programa = initPrograma();
+	listaProg = NULL;
 	arvoreExp = NULL;
-	
-	printf("Main Begin\n");
+
 	yyparse();
 
 	//imprimeVariaveis();
 	//imprimePilha(); 
 	//imprimePilhaExp();
 	//imprimeFuncoes();
-	//printf("Arvore de Expressoes\n");
-	//imprimeArvoreDoisFilhos(programa->statements,0);
-	printf("Main OVER\n");
-	imprimePrograma(programa);
+
+	imprimeProgramaNo(listaProg);
 	return 0;
 }
 
