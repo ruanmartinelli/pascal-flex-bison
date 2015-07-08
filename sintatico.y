@@ -658,7 +658,6 @@ int findVariavel(char* nomeVariavel){
 
 bool ehNumero(char* nome){
 	int i;
-	printf("Avaliando %s. Primeira letra = %d\n",nome, nome[0]);
 	for(i = 0 ; i < strlen(nome) ; i++){
 		if(nome[i] < 48 || nome[i] > 57){
 			return false;
