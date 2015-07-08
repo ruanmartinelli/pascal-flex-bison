@@ -1,20 +1,16 @@
 program global;
 
 var
- 	x, p : integer;
+ 	x, y : integer;
 
 begin
+	y := 3;
+	x := (8 + 8 + 9 + (3*3))/6;
 
-	x := 9;
+	//p := x + y;
 
-	p := 8;
+	//x:= 4 * 7;
 
-	x := 4 + p + 9 * (17);
-
-	x := (p + 2) / (4 * 5);
-
-	x := (5 * 2) * 9;
-
-
+	//x := 2 * 98 + x;
 
 end.

@@ -116,6 +116,7 @@ struct Variavel{
 	bool utilizada;
 	Dimensao* dimensoes;
 	int dimensao;
+	int val;
 };
 
 struct Dimensao{
@@ -204,8 +205,8 @@ No* desempilha(/*Pilha*/){
 	else{
 			No* op = pilhaNo->no;
 			popPilhaExp();
-			op->um = desempilha();
 			op->dois = desempilha();
+			op->um = desempilha();
 			return op;
 	}
 }
@@ -389,6 +390,8 @@ void insereVariaveis(char* nome, char* tipo, char* escopo, Dimensao* dim){
 	novo->variavel->nome 	= (char*)		malloc(sizeof(char)*tamanhoNome);
 	novo->variavel->tipo 	= (char*)		malloc(sizeof(char)*tamanhoTipo);
 	novo->variavel->escopo 	= (char*)		malloc(sizeof(char)*tamanhoEscopo);
+	novo->variavel->val 	= 0;
+
 	novo->variavel->dimensoes = (Dimensao*)malloc(sizeof(Dimensao));
 	novo->variavel->dimensoes = dim;
 
@@ -524,7 +527,6 @@ void setTipo(char* nome, char t, char* valorConstante){
 									strcpy(tipoCorrente,aux->variavel->tipo);
 								}					
 							}
-							//return;
 						}
 					}
 				}
@@ -638,6 +640,87 @@ void lancaErroRetorno(char* nome){
 	}
 }
 
+
+int findVariavel(char* nomeVariavel){
+	int i;
+	char* escopo = getEscopo();
+	for(i = 0 ; i < 977 ; i++){
+		if(variaveis[i] != NULL){
+			Hash* aux;
+			for(aux = variaveis[i] ; aux != NULL; aux = aux->prox){
+				if(strcmp(aux->variavel->nome, nomeVariavel) == 0){
+					return aux->variavel->val;
+				}
+			}
+		}
+	}
+}
+
+bool ehNumero(char* nome){
+	int i;
+	printf("Avaliando %s. Primeira letra = %d\n",nome, nome[0]);
+	for(i = 0 ; i < strlen(nome) ; i++){
+		if(nome[i] < 48 || nome[i] > 57){
+			return false;
+		}
+	}
+	return true;
+}
+
+int avaliaExp(No* arv){
+	if(arv->um == NULL && arv->dois == NULL){
+		if(ehNumero(arv->valor) == false){
+			return findVariavel(arv->valor);
+
+		}
+		return atoi(arv->valor);
+	}
+	else{
+		if(strcmp(arv->valor,"+") == 0){
+			return(avaliaExp(arv->um) + avaliaExp(arv->dois));
+		}
+		if(strcmp(arv->valor,"-") == 0){
+			return(avaliaExp(arv->um) - avaliaExp(arv->dois));
+		}
+		if(strcmp(arv->valor,"/") == 0){
+			return(avaliaExp(arv->um) / avaliaExp(arv->dois));
+		}
+		if(strcmp(arv->valor,"*") == 0){
+			return(avaliaExp(arv->um) * avaliaExp(arv->dois));
+		}
+		if(strcmp(arv->valor,"div") == 0){
+			return(avaliaExp(arv->um) / avaliaExp(arv->dois));
+		}
+		if(strcmp(arv->valor,"%") == 0){
+			return(avaliaExp(arv->um) % avaliaExp(arv->dois));
+		}
+		
+	}
+}
+
+void setValorVariavel(char* nomeVariavel, int resultado){
+	int i;
+	char* escopo = getEscopo();
+	for(i = 0 ; i < 977 ; i++){
+		if(variaveis[i] != NULL){
+			Hash* aux;
+			for(aux = variaveis[i] ; aux != NULL; aux = aux->prox){
+				if(strcmp(aux->variavel->nome, nomeVariavel) == 0 && (strcmp(aux->variavel->escopo, escopo) == 0)){
+					aux->variavel->val = resultado;
+				}
+			}
+		}
+	}
+}
+
+
+void executaAtribuicoes(No* programa){
+	No* p;
+	for(p = programa ; p != NULL ; p = p->prox){
+		setValorVariavel(p->um->valor, avaliaExp(p->dois));
+	}
+}
+
 /*Funcoes de imprimir*/
 void imprimePilhaExp(){
 	PilhaNo* p = pilhaNo;
@@ -669,9 +752,9 @@ void imprimeVariaveis(){
 		if(variaveis[i] != NULL){
 			Hash* aux;
 			for(aux = variaveis[i] ; aux != NULL; aux = aux->prox){
-				printf("	[%d] : %s		- %s		- %s 	- %d\n",
+				printf("	[%d] : %s	- %s	- %s 	- %d\n",
 				 i, aux->variavel->nome, aux->variavel->escopo, aux->variavel->tipo, aux->variavel->utilizada);
-			
+				printf("		Valor: %d\n", aux->variavel->val);
 				Dimensao* d;
 				for(d = aux->variavel->dimensoes ; d != NULL ; d = d->prox){
 					printf(" 		%d..%d\n", d->inicio, d->fim);
@@ -1029,7 +1112,7 @@ LISTA_CONSTANTES: 		CONSTANTE
 CONSTANTE:				tk_numeroReal 		{setTipo(NULL, 'p', "real"); 	pushPilhaExp(yytext);}
 						| tk_numeroInteiro 	{setTipo(NULL, 'p', "integer"); pushPilhaExp(yytext);}
 						| tk_caractere 		{setTipo(NULL, 'p', "char"); 	pushPilhaExp(yytext);}
-						| BOOL				{ setTipo(NULL, 'p', "boolean");pushPilhaExp(yytext);}
+						| BOOL				{setTipo(NULL, 'p', "boolean");pushPilhaExp(yytext);}
 						| tk_constString	{setTipo(NULL, 'p', "string"); 	pushPilhaExp(yytext);}
 ;
 
@@ -1096,11 +1179,17 @@ main(){
 
 	yyparse();
 
-	//imprimeVariaveis();
 	//imprimePilha(); 
 	//imprimePilhaExp();
 	//imprimeFuncoes();
 
+
+	//int a = avaliaExp(listaProg->dois);
+	//printf("avalia: %d\n", a);
+
+	executaAtribuicoes(listaProg);
+
+	imprimeVariaveis();
 	imprimeProgramaNo(listaProg);
 	return 0;
 }
